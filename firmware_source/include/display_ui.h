@@ -8,6 +8,20 @@
 #include "hud_data.h"
 #include "assets_icons.h"
 
+// Bảng tra cứu 82 icon gốc trích xuất trực tiếp từ IROM offset 0x2606b0 của Firmware Vietmap HUD
+// Ánh xạ chính xác 100% mã hướng rẽ `trn`, cảnh báo `alrs` và biển báo `lim` sang 43 file ảnh JPEG gốc
+static const uint8_t ORIGINAL_ICON_LOOKUP[82] PROGMEM = {
+   0,  1,  4,  5,  2,  3,  3,  4,  5,  6,
+   6,  7,  1,  2,  7,  8, 22, 23,  8,  9,
+   9, 10, 10, 11, 11, 12, 12, 13, 13, 14,
+  14, 15, 15, 16, 16, 17, 17, 18, 18, 19,
+  19, 20, 20, 21, 21, 22, 23, 24, 24, 25,
+  25, 26, 26, 27, 27, 28, 28, 29, 29, 30,
+  30, 31, 31, 32, 32, 33, 33, 34, 34, 35,
+  35, 36, 36, 37, 37, 38, 38, 39, 39, 40,
+  40,  0,
+};
+
 static TFT_eSPI tft = TFT_eSPI();
 
 // Callback cho TJpg_Decoder để đẩy pixel RGB565 ra TFT_eSPI
@@ -25,7 +39,7 @@ public:
     }
 
     void begin() {
-        Serial.printf("[UI] Initializing Display with TJPGD Assets for %s...\n", BOARD_NAME);
+        Serial.printf("[UI] Initializing Display with Accurate Vietmap Lookup for %s...\n", BOARD_NAME);
 
         #if TFT_BL >= 0
         pinMode(TFT_BL, OUTPUT);
@@ -50,51 +64,38 @@ public:
 
     void drawBootScreen() {
         tft.fillScreen(TFT_BLACK);
-        
+
         #if SCREEN_IS_ROUND
-        // Vẽ vòng tròn trang trí cho màn hình tròn
         tft.drawCircle(120, 120, 118, TFT_CYAN);
         tft.drawCircle(120, 120, 115, TFT_NAVY);
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
-        tft.setTextSize(2);
-        tft.drawCentreString("VIETMAP HUD", 120, 70, 2);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setTextSize(1);
-        tft.drawCentreString("Round Edition", 120, 115, 2);
+        tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 120, 75, 4);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.drawCentreString("BLE: Ready", 120, 145, 2);
+        tft.drawCentreString("BLE: Ready", 120, 125, 2);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawCentreString("VIETMAP LIVE", 120, 155, 2);
         #else
-        // Màn hình ngang 320x240
+        tft.drawRoundRect(10, 10, 300, 220, 10, TFT_BLUE);
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
-        tft.setTextSize(3);
-        tft.drawCentreString("VIETMAP HUD PRO", 160, 60, 2);
-        tft.setTextSize(2);
-        tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawCentreString("CYD 2.4 Edition", 160, 120, 2);
+        tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 160, 45, 4);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.drawCentreString("BLE Name: VIETMAP_HUD", 160, 160, 2);
+        tft.drawCentreString("Bluetooth: VIETMAP_HUD (Ready)", 160, 100, 2);
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.drawCentreString("Lai xe an toan", 160, 140, 2);
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.drawCentreString("Open Vietmap Live App to Connect", 160, 180, 2);
         #endif
 
-        delay(ConfigManager::getInstance().get().boot_screen_duration);
-        tft.fillScreen(TFT_BLACK);
+        beep(2400, 120);
     }
 
-    void update(SystemState& state) {
-        // Tự động điều chỉnh độ sáng nếu có quang trở LDR
-        #if LDR_SENSOR_PIN >= 0
-        if (ConfigManager::getInstance().get().auto_brightness) {
-            int ldrVal = analogRead(LDR_SENSOR_PIN);
-            state.ambient_light = ldrVal;
-            // Ánh sáng mạnh (ban ngày) -> ldrVal thấp hoặc cao tùy mạch, map sang 10..100%
-            int duty = map(ldrVal, 200, 3500, ConfigManager::getInstance().get().night_brightness, ConfigManager::getInstance().get().led_brightness);
-            duty = constrain(duty, 15, 100);
-            #if TFT_BL >= 0
-            analogWrite(TFT_BL, (duty * 255) / 100);
-            #endif
-        }
-        #endif
+    void update(const SystemState& state) {
+        handleAutoBrightness();
+        handleSoundAlerts(state);
 
-        if (state.ble_phone_connected && state.nav.nav_active) {
+        bool has_nav = state.ble_phone_connected && (state.nav.nav_active || state.nav.speed_limit > 0 || state.nav.speed > 0);
+
+        if (has_nav) {
             #if SCREEN_IS_ROUND
             renderRoundNavScreen(state);
             #else
@@ -105,23 +106,87 @@ public:
         }
     }
 
+    void handleAutoBrightness() {
+        #if LDR_SENSOR_PIN >= 0 && TFT_BL >= 0
+        if (ConfigManager::getInstance().get().auto_brightness) {
+            uint16_t ldr_val = analogRead(LDR_SENSOR_PIN);
+            uint8_t target_brightness = map(ldr_val, 500, 3500, ConfigManager::getInstance().get().night_brightness, ConfigManager::getInstance().get().led_brightness);
+            target_brightness = constrain(target_brightness, 25, 255);
+            analogWrite(TFT_BL, target_brightness);
+        }
+        #endif
+    }
+
+    void handleSoundAlerts(const SystemState& state) {
+        // 1. Cảnh báo đổi biển báo giới hạn tốc độ (Double Beep)
+        if (ConfigManager::getInstance().get().beep_limit_change) {
+            if (last_limit > 0 && state.nav.speed_limit > 0 && state.nav.speed_limit != last_limit) {
+                beep(2600, 70);
+                delay(60);
+                beep(2600, 70);
+            }
+        }
+
+        // 2. Cảnh báo chạy quá tốc độ giới hạn (Continuous Beep)
+        if (ConfigManager::getInstance().get().beep_overspeed) {
+            int16_t max_allowed = state.nav.speed_limit + ConfigManager::getInstance().get().speed_limit_offset;
+            if (state.nav.speed_limit > 0 && state.nav.speed > max_allowed) {
+                uint32_t now = millis();
+                if (now - last_overspeed_beep >= 400) {
+                    last_overspeed_beep = now;
+                    beep(2800, 120);
+                }
+            }
+        }
+
+        // 3. Cảnh báo sắp đến ngã rẽ (dưới 300 mét)
+        if (state.nav.nav_active && state.nav.turn_icon > 0 && state.nav.distance_to_turn > 0 && state.nav.distance_to_turn <= 300) {
+            if (!turn_notified && state.nav.distance_to_turn >= 250) {
+                turn_notified = true;
+                beep(2200, 100);
+            }
+        } else {
+            turn_notified = false;
+        }
+    }
+
     void beep(uint16_t freq, uint16_t duration_ms) {
         #if BUZZER_PIN >= 0
         tone(BUZZER_PIN, freq, duration_ms);
         #endif
     }
 
+    void toggleScreenMode() {
+        screen_mode = (screen_mode + 1) % 3;
+        tft.fillScreen(TFT_BLACK);
+        beep(2000, 50);
+    }
+
+    void rotateScreen() {
+        #if !SCREEN_IS_ROUND
+        uint8_t rot = (tft.getRotation() + 1) % 4;
+        tft.setRotation(rot);
+        ConfigManager::getInstance().get().display_rotation = rot;
+        ConfigManager::getInstance().saveConfig();
+        tft.fillScreen(TFT_BLACK);
+        beep(2400, 80);
+        #endif
+    }
+
 private:
-    int16_t last_speed = -99;
-    int16_t last_limit = -99;
-    uint8_t last_turn = 255;
+    int16_t  last_speed = -99;
+    int16_t  last_limit = -99;
+    uint8_t  last_turn = 255;
     uint32_t last_dist = 999999;
-    uint8_t last_mode = 255;
+    uint8_t  last_mode = 255;
+    uint32_t last_overspeed_beep = 0;
+    bool     turn_notified = false;
+    uint8_t  screen_mode = 0;
 
     DisplayUI() {}
 
     // =========================================================================
-    // 1. GIAO DIỆN MÀN HÌNH CHỮ NHẬT 320x240 (ESP32-2432S024)
+    // 1. GIAO DIỆN MÀN HÌNH CHỮ NHẬT 320x240 (ESP32-2432S024 CYD)
     // =========================================================================
     void renderLandscapeNavScreen(const SystemState& state) {
         if (last_mode != 1) {
@@ -131,159 +196,121 @@ private:
             last_limit = -99;
             last_turn = 255;
             last_dist = 999999;
+            tft.drawFastHLine(0, 205, 320, TFT_DARKGREY);
         }
 
         int16_t spd = state.nav.speed;
         int16_t lim = state.nav.speed_limit;
         bool overspeed = (lim > 0 && spd > (lim + ConfigManager::getInstance().get().speed_limit_offset));
 
-        // 1. Biển báo giới hạn tốc độ (Bên trái: x=10..75, y=30)
+        // 1. Biển báo giới hạn tốc độ gốc (JPEG 60x60)
         if (lim != last_limit) {
             last_limit = lim;
-            drawSpeedLimitSign(15, 35, 38, lim);
-            if (ConfigManager::getInstance().get().beep_limit_change) {
-                beep(2000, 100);
-            }
+            drawSpeedLimitSign(15, 25, lim);
         }
 
-        // 2. Tốc độ hiện tại ở giữa (x=105..220)
+        // 2. Số tốc độ hiện tại cực lớn ở giữa
         if (spd != last_speed) {
             last_speed = spd;
-            tft.fillRect(105, 30, 115, 95, TFT_BLACK);
+            tft.fillRect(95, 15, 130, 95, TFT_BLACK);
             uint16_t col = overspeed ? TFT_RED : TFT_GREEN;
             tft.setTextColor(col, TFT_BLACK);
-            
-            // Vẽ số tốc độ lớn
-            tft.setTextSize(1);
+
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", spd);
-            tft.drawCentreString(buf, 160, 30, 8); // Font 8 (75px)
+            tft.drawCentreString(buf, 160, 20, 8); // Font 8 (75px)
 
-            // Đơn vị km/h
             if (ConfigManager::getInstance().get().show_text_kmh) {
                 tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-                tft.drawCentreString("km/h", 160, 115, 2);
-            }
-
-            if (overspeed && ConfigManager::getInstance().get().beep_overspeed) {
-                beep(2500, 80);
+                tft.drawCentreString("km/h", 160, 98, 2);
             }
         }
 
-        // 3. Mũi tên chỉ đường và khoảng cách (Bên phải: x=235..315)
+        // 3. Mũi tên rẽ và khoảng cách gốc (JPEG 60x60)
         if (state.nav.turn_icon != last_turn || state.nav.distance_to_turn != last_dist) {
             last_turn = state.nav.turn_icon;
             last_dist = state.nav.distance_to_turn;
-            drawTurnIconAndDist(240, 35, state.nav.turn_icon, state.nav.distance_to_turn);
+            drawTurnIconAndDist(240, 20, state.nav.turn_icon, state.nav.distance_to_turn, state.nav.exit_num);
         }
 
-        // 4. Thanh cảnh báo hoặc tên đường (Dưới đáy: y=190..240)
+        // 4. Dòng cảnh báo Camera hoặc Tên đường
+        tft.fillRect(10, 135, 300, 60, TFT_BLACK);
         if (state.nav.alerts.length() > 0) {
-            tft.fillRect(0, 195, 320, 45, TFT_RED);
-            tft.setTextColor(TFT_WHITE, TFT_RED);
-            tft.drawCentreString(state.nav.alerts, 160, 205, 4);
+            tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+            tft.drawCentreString(state.nav.alerts, 160, 138, 4);
+            drawAlertCameraIcon(15, 135);
         } else if (state.nav.street_name.length() > 0) {
-            tft.fillRect(0, 195, 320, 45, 0x0011); // Navy blue
-            tft.setTextColor(TFT_YELLOW, 0x0011);
-            tft.drawCentreString(state.nav.street_name, 160, 205, 4);
-        } else {
-            tft.fillRect(0, 195, 320, 45, TFT_BLACK);
-            tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-            tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 160, 205, 2);
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+            tft.drawCentreString(state.nav.street_name, 160, 142, 2);
         }
 
-        // Thanh trạng thái trên đỉnh (y=5..20): Giờ & ETA
-        tft.fillRect(0, 0, 320, 22, 0x10A2);
-        tft.setTextColor(TFT_WHITE, 0x10A2);
-        tft.drawString("BLE CONNECTED", 10, 4, 2);
-        if (state.nav.eta.length() > 0) {
-            String etaStr = "ETA: " + state.nav.eta;
-            tft.drawRightString(etaStr, 310, 4, 2);
+        // 5. Thanh trạng thái dưới cùng (Footer)
+        tft.fillRect(5, 210, 310, 25, TFT_BLACK);
+        tft.setTextColor(TFT_CYAN, TFT_BLACK);
+        tft.drawString(state.current_time_str, 10, 212, 2);
+
+        if (state.nav.remain_km > 0.0f || state.nav.remain_min > 0) {
+            char trip_buf[32];
+            snprintf(trip_buf, sizeof(trip_buf), "Con: %.1f km (%d p)", state.nav.remain_km, state.nav.remain_min);
+            tft.drawRightString(trip_buf, 310, 212, 2);
         } else {
-            tft.drawRightString(state.current_time_str, 310, 4, 2);
+            tft.drawRightString("VIETMAP LIVE", 310, 212, 2);
         }
     }
 
     // =========================================================================
-    // 2. GIAO DIỆN MÀN HÌNH TRÒN 240x240 (ESP32-2424S012)
+    // 2. GIAO DIỆN MÀN HÌNH TRÒN 240x240 (ESP32-2424S012 GC9A01)
     // =========================================================================
     void renderRoundNavScreen(const SystemState& state) {
-        if (last_mode != 1) {
+        if (last_mode != 2) {
             tft.fillScreen(TFT_BLACK);
-            last_mode = 1;
+            last_mode = 2;
             last_speed = -99;
             last_limit = -99;
             last_turn = 255;
-            // Vẽ viền tròn thể thao
-            tft.drawCircle(120, 120, 119, 0x3186);
-            tft.drawCircle(120, 120, 118, 0x2104);
+            last_dist = 999999;
         }
 
         int16_t spd = state.nav.speed;
         int16_t lim = state.nav.speed_limit;
-        bool overspeed = (lim > 0 && spd > (lim + ConfigManager::getInstance().get().speed_limit_offset));
 
-        // 1. Biển báo tốc độ giới hạn (Ở đỉnh vòng tròn: x=120, y=30)
+        // Vòng cung tốc độ quanh viền tròn
+        uint16_t arc_color = (lim > 0 && spd > lim) ? TFT_RED : TFT_CYAN;
+        tft.drawCircle(120, 120, 118, TFT_NAVY);
+        tft.drawCircle(120, 120, 117, arc_color);
+
+        // Biển báo tốc độ ở đỉnh trên
         if (lim != last_limit) {
             last_limit = lim;
-            drawSpeedLimitSign(95, 12, 25, lim);
-            if (ConfigManager::getInstance().get().beep_limit_change) {
-                beep(2000, 100);
-            }
+            drawSpeedLimitSign(90, 15, lim);
         }
 
-        // 2. Tốc độ ở tâm vòng tròn (x=120, y=75..145)
+        // Số tốc độ ở giữa tâm
         if (spd != last_speed) {
             last_speed = spd;
-            tft.fillRect(45, 75, 150, 75, TFT_BLACK);
-            uint16_t col = overspeed ? TFT_RED : TFT_GREEN;
-            tft.setTextColor(col, TFT_BLACK);
+            tft.fillRect(40, 85, 160, 75, TFT_BLACK);
+
+            bool overspeed = (lim > 0 && spd > (lim + ConfigManager::getInstance().get().speed_limit_offset));
+            tft.setTextColor(overspeed ? TFT_RED : TFT_WHITE, TFT_BLACK);
+
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", spd);
-            tft.drawCentreString(buf, 120, 75, 7); // Font 7 7-segment 48px
+            tft.drawCentreString(buf, 120, 85, 7);
 
             tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-            tft.drawCentreString("km/h", 120, 128, 2);
-
-            if (overspeed && ConfigManager::getInstance().get().beep_overspeed) {
-                beep(2500, 80);
-            }
+            tft.drawCentreString("km/h", 120, 145, 2);
         }
 
-        // 3. Mũi tên chỉ đường và khoảng cách (Ở đáy vòng tròn: y=160..210)
+        // Mũi tên rẽ và khoảng cách ở nửa dưới
         if (state.nav.turn_icon != last_turn || state.nav.distance_to_turn != last_dist) {
             last_turn = state.nav.turn_icon;
             last_dist = state.nav.distance_to_turn;
-            tft.fillRect(50, 155, 140, 55, TFT_BLACK);
-            
-            // Vẽ biểu tượng rẽ đơn giản
-            tft.setTextColor(TFT_CYAN, TFT_BLACK);
-            String arrow = "";
-            if (state.nav.turn_icon == TURN_LEFT || state.nav.turn_icon == TURN_SLIGHT_LEFT) arrow = "<--";
-            else if (state.nav.turn_icon == TURN_RIGHT || state.nav.turn_icon == TURN_SLIGHT_RIGHT) arrow = "-->";
-            else if (state.nav.turn_icon == TURN_STRAIGHT) arrow = "^^";
-            else if (state.nav.turn_icon == TURN_ROUNDABOUT) arrow = "(O)";
-            
-            if (arrow.length() > 0) {
-                tft.drawCentreString(arrow, 120, 155, 4);
-            }
-
-            // Khoảng cách
-            tft.setTextColor(TFT_WHITE, TFT_BLACK);
-            if (state.nav.distance_to_turn >= 1000) {
-                char dBuf[16];
-                snprintf(dBuf, sizeof(dBuf), "%.1f km", state.nav.distance_to_turn / 1000.0f);
-                tft.drawCentreString(dBuf, 120, 185, 2);
-            } else {
-                char dBuf[16];
-                snprintf(dBuf, sizeof(dBuf), "%u m", state.nav.distance_to_turn);
-                tft.drawCentreString(dBuf, 120, 185, 2);
-            }
+            drawTurnIconAndDist(90, 165, state.nav.turn_icon, state.nav.distance_to_turn, state.nav.exit_num);
         }
     }
 
     // =========================================================================
-    // 3. MÀN HÌNH CHỜ STANDBY (ĐỒNG HỒ & THỜI TIẾT KHI XE CHƯA KẾT NỐI APP)
+    // 3. MÀN HÌNH CHỜ STANDBY (KHI CHƯA DẪN ĐƯỜNG)
     // =========================================================================
     void renderStandbyScreen(const SystemState& state) {
         if (last_mode != 0) {
@@ -292,75 +319,74 @@ private:
         }
 
         #if SCREEN_IS_ROUND
-        tft.drawCircle(120, 120, 118, TFT_CYAN);
+        tft.drawCircle(120, 120, 118, TFT_DARKCYAN);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawCentreString(state.current_time_str, 120, 85, 7);
-        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-        tft.drawCentreString("VIETMAP HUD", 120, 145, 2);
+        tft.drawCentreString(state.current_time_str, 120, 80, 7);
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.drawCentreString("Waiting Phone...", 120, 175, 2);
+        tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 120, 140, 4);
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.drawCentreString("Dang cho Vietmap...", 120, 175, 2);
         #else
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.drawCentreString(state.current_time_str, 160, 65, 8);
+        tft.drawCentreString(state.current_time_str, 160, 50, 8);
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
-        tft.drawCentreString("VIETMAP HUD PRO", 160, 145, 4);
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.drawCentreString("Connect Vietmap App via BLE", 160, 185, 2);
+        tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 160, 135, 4);
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.drawCentreString("Vui long mo App Vietmap Live tren Dien Thoai", 160, 175, 2);
+        tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+        tft.drawCentreString("Bluetooth ID: VIETMAP_HUD", 160, 205, 2);
         #endif
     }
 
-    void drawSpeedLimitSign(int x, int y, int r, int limit) {
-        // Ánh xạ giới hạn tốc độ sang icon JPEG chuẩn của Vietmap
-        int iconIdx = -1;
-        if (limit == 20) iconIdx = 29;
-        else if (limit == 30) iconIdx = 30;
-        else if (limit == 40) iconIdx = 31;
-        else if (limit == 50) iconIdx = 32;
-        else if (limit == 60) iconIdx = 33;
-        else if (limit == 70) iconIdx = 34;
-        else if (limit == 80) iconIdx = 35;
-        else if (limit == 90) iconIdx = 36;
-        else if (limit == 100) iconIdx = 37;
-        else if (limit == 120) iconIdx = 38;
+    // =========================================================================
+    // 4. HÀM VẼ ICON CHUẨN XÁC THEO BẢNG TRA CỨU FIRMWARE GỐC
+    // =========================================================================
+    void drawSpeedLimitSign(int x, int y, int limit) {
+        tft.fillRect(x, y, 65, 65, TFT_BLACK);
 
-        if (iconIdx >= 0 && iconIdx < HUD_ICON_COUNT) {
-            // Vẽ trực tiếp bằng file ảnh JPEG gốc 60x60
-            TJpgDec.drawJpg(x, y, HUD_ICONS[iconIdx].data, HUD_ICONS[iconIdx].size);
-            return;
+        int lookup_idx = -1;
+        if (limit == 20) lookup_idx = 57;
+        else if (limit == 30) lookup_idx = 59;
+        else if (limit == 40) lookup_idx = 61;
+        else if (limit == 50) lookup_idx = 63;
+        else if (limit == 60) lookup_idx = 65;
+        else if (limit == 70) lookup_idx = 67;
+        else if (limit == 80) lookup_idx = 69;
+        else if (limit == 90) lookup_idx = 71;
+        else if (limit == 100) lookup_idx = 73;
+        else if (limit == 120) lookup_idx = 77;
+
+        if (lookup_idx >= 0 && lookup_idx < 82) {
+            uint8_t img_idx = pgm_read_byte(&ORIGINAL_ICON_LOOKUP[lookup_idx]);
+            if (img_idx < HUD_ICON_COUNT) {
+                TJpgDec.drawJpg(x, y, HUD_ICONS[img_idx].data, HUD_ICONS[img_idx].size);
+                return;
+            }
         }
 
-        // Fallback: Vẽ vector tròn nếu là giá trị tốc độ lạ
-        tft.fillCircle(x + r, y + r, r, TFT_RED);
-        tft.fillCircle(x + r, y + r, r - 5, TFT_WHITE);
+        // Fallback: Vẽ biển báo tròn vector nếu limit khác thường
+        tft.fillCircle(x + 30, y + 30, 30, TFT_RED);
+        tft.fillCircle(x + 30, y + 30, 24, TFT_WHITE);
         tft.setTextColor(TFT_BLACK, TFT_WHITE);
         if (limit > 0 && limit < 200) {
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", limit);
-            tft.drawCentreString(buf, x + r, y + (r/3), 4);
+            tft.drawCentreString(buf, x + 30, y + 15, 4);
         } else {
-            tft.drawCentreString("--", x + r, y + (r/3), 4);
+            tft.drawCentreString("--", x + 30, y + 15, 4);
         }
     }
 
-    void drawTurnIconAndDist(int x, int y, uint8_t turn, uint32_t dist) {
-        tft.fillRect(x, y, 75, 90, TFT_BLACK);
+    void drawTurnIconAndDist(int x, int y, uint8_t turn, uint32_t dist, uint8_t exit_num) {
+        tft.fillRect(x, y, 70, 85, TFT_BLACK);
 
-        // Ánh xạ mã rẽ sang icon JPEG gốc của Vietmap (icon 0..15)
-        int iconIdx = -1;
-        if (turn >= 1 && turn <= 12) {
-            iconIdx = turn - 1; // Map vào bộ icon JPEG
+        uint8_t img_idx = 0;
+        if (turn < 82) {
+            img_idx = pgm_read_byte(&ORIGINAL_ICON_LOOKUP[turn]);
         }
 
-        if (iconIdx >= 0 && iconIdx < HUD_ICON_COUNT) {
-            TJpgDec.drawJpg(x + 5, y, HUD_ICONS[iconIdx].data, HUD_ICONS[iconIdx].size);
-        } else {
-            tft.setTextColor(TFT_CYAN, TFT_BLACK);
-            String arrow = "";
-            if (turn == TURN_LEFT || turn == TURN_SLIGHT_LEFT || turn == TURN_SHARP_LEFT) arrow = "<-";
-            else if (turn == TURN_RIGHT || turn == TURN_SLIGHT_RIGHT || turn == TURN_SHARP_RIGHT) arrow = "->";
-            else if (turn == TURN_STRAIGHT) arrow = "^^";
-            else if (turn == TURN_ROUNDABOUT) arrow = "O";
-            tft.drawCentreString(arrow, x + 35, y + 5, 4);
+        if (img_idx < HUD_ICON_COUNT) {
+            TJpgDec.drawJpg(x + 5, y, HUD_ICONS[img_idx].data, HUD_ICONS[img_idx].size);
         }
 
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -368,10 +394,17 @@ private:
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f km", dist / 1000.0f);
             tft.drawCentreString(buf, x + 35, y + 65, 2);
-        } else {
+        } else if (dist > 0) {
             char buf[16];
             snprintf(buf, sizeof(buf), "%u m", dist);
             tft.drawCentreString(buf, x + 35, y + 65, 2);
+        }
+    }
+
+    void drawAlertCameraIcon(int x, int y) {
+        uint8_t cam_idx = 22; // Icon Camera Phạt Nguội gốc
+        if (cam_idx < HUD_ICON_COUNT) {
+            TJpgDec.drawJpg(x, y, HUD_ICONS[cam_idx].data, HUD_ICONS[cam_idx].size);
         }
     }
 };

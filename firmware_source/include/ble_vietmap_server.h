@@ -149,6 +149,18 @@ private:
         if (doc.containsKey("alrs")) state->nav.alerts = doc["alrs"].as<String>();
         if (doc.containsKey("lan")) state->nav.lanes = doc["lan"].as<uint8_t>();
 
+        // Đồng bộ thời gian thực từ GPS điện thoại (Epoch timestamp)
+        if (doc.containsKey("unix")) {
+            uint32_t epoch = doc["unix"].as<uint32_t>();
+            // Múi giờ Việt Nam GMT+7 (+25200s)
+            uint32_t vn_epoch = epoch + 7 * 3600;
+            uint8_t h = (vn_epoch / 3600) % 24;
+            uint8_t m = (vn_epoch / 60) % 60;
+            char t_str[16];
+            snprintf(t_str, sizeof(t_str), "%02d:%02d", h, m);
+            state->current_time_str = String(t_str);
+        }
+
         state->nav.last_updated = millis();
     }
 };

@@ -75,19 +75,27 @@ void loop() {
         DisplayUI::getInstance().update(g_sysState);
     }
 
-    // Xử lý nút bấm (Chuyển chế độ / Test)
+    // Xử lý nút bấm (Bấm ngắn: Đổi mode / Bấm giữ: Xoay màn hình)
     #if BUTTON_PIN >= 0
-    static uint32_t lastPress = 0;
-    if (digitalRead(BUTTON_PIN) == LOW && (now - lastPress > 350)) {
-        lastPress = now;
-        Serial.println("[Button] Clicked! Toggle Rotation or Test Mode");
-        DisplayUI::getInstance().beep(1500, 50);
+    static uint32_t pressStart = 0;
+    static bool isPressed = false;
+    bool btnState = (digitalRead(BUTTON_PIN) == LOW);
 
-        #if !SCREEN_IS_ROUND
-        auto& cfg = ConfigManager::getInstance().get();
-        cfg.display_rotation = (cfg.display_rotation == 1) ? 3 : 1;
-        ConfigManager::getInstance().saveConfig();
-        #endif
+    if (btnState && !isPressed) {
+        isPressed = true;
+        pressStart = now;
+    } else if (!btnState && isPressed) {
+        isPressed = false;
+        uint32_t pressDur = now - pressStart;
+        if (pressDur > 1500) {
+            // Bấm giữ > 1.5 giây: Xoay màn hình
+            Serial.println("[Button] Long press: Rotate Screen");
+            DisplayUI::getInstance().rotateScreen();
+        } else if (pressDur > 50) {
+            // Bấm ngắn: Đổi chế độ hiển thị
+            Serial.println("[Button] Short press: Toggle Mode");
+            DisplayUI::getInstance().toggleScreenMode();
+        }
     }
     #endif
 
