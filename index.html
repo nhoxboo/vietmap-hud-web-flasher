@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIETMAP HUD Web Flasher & Configurator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ESP Web Tools CDN -->
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F8FAFC;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        esp-web-install-button {
+            --esp-tools-button-border-radius: 0.75rem;
+            --esp-tools-button-color: #2563EB;
+            --esp-tools-button-text-color: #FFFFFF;
+            --esp-tools-button-padding: 0.75rem 1.75rem;
+            --esp-tools-button-font-size: 1rem;
+            --esp-tools-button-font-weight: 600;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F1F5F9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+        /* HUD Simulation Canvas */
+        .hud-screen-cyd {
+            width: 320px;
+            height: 240px;
+            background: #000000;
+            border-radius: 8px;
+            box-shadow: 0 0 25px rgba(37, 99, 235, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+        .hud-screen-round {
+            width: 240px;
+            height: 240px;
+            background: #000000;
+            border-radius: 50%;
+            border: 4px solid #1E293B;
+            box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row text-slate-800">
+
+    <!-- SIDEBAR TỐI (#1E293B) THEO CHUẨN USER PROFILE -->
+    <aside class="w-full md:w-64 bg-[#1E293B] text-slate-300 flex-shrink-0 flex flex-col justify-between p-5 border-r border-slate-700/50">
+        <div>
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 mb-8">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                    <i data-lucide="gauge" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">VIETMAP HUD</h1>
+                    <p class="text-xs text-blue-400 font-medium">Web Flasher Pro</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <nav class="space-y-1.5" id="nav-tabs">
+                <button onclick="switchTab('flash')" id="tab-btn-flash" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all bg-blue-600 text-white shadow-md shadow-blue-600/20">
+                    <i data-lucide="zap" class="w-4 h-4"></i>
+                    <span>Nạp Firmware USB</span>
+                </button>
+                <button onclick="switchTab('ble-config')" id="tab-btn-ble-config" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i data-lucide="bluetooth" class="w-4 h-4"></i>
+                    <span>Cấu Hình Bluetooth</span>
+                </button>
+                <button onclick="switchTab('simulator')" id="tab-btn-simulator" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i data-lucide="monitor" class="w-4 h-4"></i>
+                    <span>Trình Giả Lập HUD</span>
+                </button>
+                <button onclick="switchTab('guide')" id="tab-btn-guide" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span>Sơ Đồ & Đấu Nối</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Footer Info -->
+        <div class="pt-6 border-t border-slate-700/60 text-xs text-slate-400">
+            <div class="flex items-center space-x-2 mb-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-slate-300 font-medium">Bản Build: v1.3.6 (No-OBD)</span>
+            </div>
+            <p>Tương thích ESP32 CYD 2.4" & Màn hình tròn 1.28".</p>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT TRẮNG (#FFFFFF) THEO CHUẨN USER PROFILE -->
+    <main class="flex-1 bg-white flex flex-col min-h-screen overflow-y-auto">
+
+        <!-- Top Header Bar -->
+        <header class="h-16 border-b border-slate-100 px-6 flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-20">
+            <div class="flex items-center space-x-2">
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200/60">
+                    Web Serial & BLE 4.2
+                </span>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                    Lightweight Optimized
+                </span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <a href="https://github.com/nhoxboo/vietmap-hud-web-flasher" target="_blank" class="inline-flex items-center space-x-2 text-sm text-slate-600 hover:text-blue-600 transition font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 border border-slate-200">
+                    <i data-lucide="github" class="w-4 h-4"></i>
+                    <span>GitHub Repo</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- TAB CONTENT CONTAINER -->
+        <div class="p-6 md:p-8 max-w-6xl mx-auto w-full">
+
+            <!-- =================================================================== -->
+            <!-- 1. TAB NẠP FIRMWARE (FLASH) -->
+            <!-- =================================================================== -->
+            <section id="pane-flash" class="space-y-8 block">
+                <!-- Heading -->
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Nạp Firmware Cho ESP32 Trực Tiếp Trên Web</h2>
+                    <p class="text-slate-500 mt-1">Sử dụng Google Chrome / Microsoft Edge kết nối cáp USB với ESP32 để nạp chương trình chỉ bằng 1 cú nhấp chuột.</p>
+                </div>
+
+                <!-- Hardware Selection Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Card 1: ESP32-2432S024 -->
+                    <div id="card-hw-cyd" onclick="selectHardware('esp32_2432s024')" class="cursor-pointer border-2 border-blue-600 bg-blue-50/40 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden">
+                        <div class="absolute top-4 right-4">
+                            <span id="badge-cyd" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white">Đang chọn</span>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-4 shadow-md shadow-blue-500/20">
+                            <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900">ESP32-2432S024</h3>
+                        <p class="text-sm font-medium text-blue-600 mt-0.5">Màn hình chữ nhật 2.4" / 2.8" (CYD Cheap Yellow Display)</p>
+                        <ul class="mt-4 space-y-2 text-xs text-slate-600">
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-600 mr-2"></i>Driver LCD: ILI9341 SPI (320x240 ngang)</li>
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-600 mr-2"></i>Tích hợp còi Buzzer GPIO 26 & Cảm biến quang trở LDR</li>
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-600 mr-2"></i>Đã tối ưu bỏ OBD, phản hồi cực nhanh 4Hz</li>
+                        </ul>
+                    </div>
+
+                    <!-- Card 2: ESP32-2424S012 -->
+                    <div id="card-hw-round" onclick="selectHardware('esp32_2424s012')" class="cursor-pointer border-2 border-slate-200 bg-white hover:border-slate-300 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden">
+                        <div class="absolute top-4 right-4">
+                            <span id="badge-round" class="hidden inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-600 text-white">Đang chọn</span>
+                        </div>
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center mb-4">
+                            <i data-lucide="circle-dot" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900">ESP32-2424S012</h3>
+                        <p class="text-sm font-medium text-slate-500 mt-0.5">Màn hình tròn 1.28" GC9A01 (Round Display)</p>
+                        <ul class="mt-4 space-y-2 text-xs text-slate-600">
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 mr-2"></i>Driver LCD: GC9A01 SPI (240x240 tròn)</li>
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 mr-2"></i>Giao diện mặt đồng hồ thể thao Taplo siêu sang</li>
+                            <li class="flex items-center"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 mr-2"></i>Kích thước siêu nhỏ gọn, phù hợp gắn taplo/xe máy</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Web Serial Flash Console Card -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div class="space-y-2 max-w-xl">
+                        <div class="inline-flex items-center space-x-2 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-100 text-blue-700">
+                            <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+                            <span id="selected-hw-label">Thiết bị: ESP32-2432S024 (CYD 2.4")</span>
+                        </div>
+                        <h4 class="text-xl font-bold text-slate-900">Sẵn Sàng Nạp Vào Board</h4>
+                        <p class="text-sm text-slate-600 leading-relaxed">
+                            Cắm cáp USB nối ESP32 với máy tính. Nhấn nút <strong>CONNECT</strong> bên dưới, chọn cổng COM (CH340 / CP2102) để trình duyệt tự động xóa Flash và nạp toàn bộ Bootloader, Partition Table và Firmware mới.
+                        </p>
+                    </div>
+
+                    <!-- ESP Web Tools Button Component -->
+                    <div class="flex-shrink-0 text-center">
+                        <div id="esp-installer-container">
+                            <esp-web-install-button id="esp-btn" manifest="manifest_2432s024.json">
+                                <button slot="activate" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3.5 rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center space-x-2">
+                                    <i data-lucide="download" class="w-5 h-5"></i>
+                                    <span>Nạp Ngay (Web Serial)</span>
+                                </button>
+                                <span slot="unsupported" class="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                                    Trình duyệt chưa hỗ trợ Web Serial. Vui lòng dùng Chrome hoặc Edge trên máy tính!
+                                </span>
+                            </esp-web-install-button>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">Baudrate tự động: 921600 / 115200</p>
+                    </div>
+                </div>
+
+                <!-- Direct Binary Download Options -->
+                <div class="border border-slate-200 rounded-2xl p-6 bg-white">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="font-bold text-slate-900 text-base">Tải File Binary Nạp Thủ Công (Offline)</h4>
+                            <p class="text-xs text-slate-500">Dành cho trường hợp nạp qua Flash Download Tools hoặc esptool.py qua terminal.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-bold text-slate-800">ESP32-2432S024 Full Image</p>
+                                <p class="text-xs text-slate-500 font-mono">Offset 0x0000 | 1.30 MB</p>
+                            </div>
+                            <a href="firmwares/esp32_2432s024/full_merged.bin" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:border-blue-300 transition shadow-sm">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Tải .bin</span>
+                            </a>
+                        </div>
+                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-bold text-slate-800">ESP32-2424S012 Full Image</p>
+                                <p class="text-xs text-slate-500 font-mono">Offset 0x0000 | 1.29 MB</p>
+                            </div>
+                            <a href="firmwares/esp32_2424s012/full_merged.bin" download class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-blue-600 hover:border-blue-300 transition shadow-sm">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>Tải .bin</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =================================================================== -->
+            <!-- 2. TAB CẤU HÌNH QUA BLUETOOTH (BLE CONFIGURATOR) -->
+            <!-- =================================================================== -->
+            <section id="pane-ble-config" class="space-y-6 hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Cấu Hình HUD Trực Tiếp Qua Web Bluetooth</h2>
+                        <p class="text-slate-500 mt-1">Kết nối không dây từ trình duyệt đến HUD để chỉnh độ sáng, tiếng bíp, bù trừ tốc độ và tên chào mừng.</p>
+                    </div>
+                    <div>
+                        <button id="ble-connect-btn" onclick="toggleBleConnection()" class="px-5 py-2.5 rounded-xl font-semibold text-sm bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center space-x-2">
+                            <i data-lucide="bluetooth" class="w-4 h-4"></i>
+                            <span id="ble-btn-text">Quét & Kết Nối BLE HUD</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status banner -->
+                <div id="ble-status-banner" class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-sm">
+                    <div class="flex items-center space-x-3">
+                        <span id="ble-dot" class="w-3 h-3 rounded-full bg-slate-400"></span>
+                        <span id="ble-status-text" class="text-slate-600 font-medium">Chưa kết nối thiết bị Bluetooth nào.</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-mono">Service UUID: 8a7e0001-...</span>
+                </div>
+
+                <!-- Configuration Form -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Display & Brightness Card -->
+                    <div class="p-6 rounded-2xl border border-slate-200 bg-white space-y-4 shadow-sm">
+                        <div class="flex items-center space-x-2 text-slate-900 font-bold">
+                            <i data-lucide="sun" class="w-5 h-5 text-amber-500"></i>
+                            <span>Màn Hình & Độ Sáng</span>
+                        </div>
+                        
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>Độ sáng ban ngày</span>
+                                <span id="val-bright-day">80%</span>
+                            </div>
+                            <input type="range" id="cfg-bright-day" min="10" max="100" value="80" oninput="updateVal('bright-day')" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>Độ sáng ban đêm</span>
+                                <span id="val-bright-night">25%</span>
+                            </div>
+                            <input type="range" id="cfg-bright-night" min="10" max="100" value="25" oninput="updateVal('bright-night')" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <span class="text-sm text-slate-700 font-medium">Tự động chỉnh độ sáng qua quang trở LDR</span>
+                            <input type="checkbox" id="cfg-auto-bright" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-700 font-medium">Xoay hướng màn hình</span>
+                            <select id="cfg-rotation" class="text-xs font-medium border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-700">
+                                <option value="1">Ngang chuẩn (Rotation 1)</option>
+                                <option value="3">Ngang ngược (Rotation 3)</option>
+                                <option value="0">Dọc xuôi (Rotation 0)</option>
+                                <option value="2">Dọc ngược (Rotation 2)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Alerts & Sounds Card -->
+                    <div class="p-6 rounded-2xl border border-slate-200 bg-white space-y-4 shadow-sm">
+                        <div class="flex items-center space-x-2 text-slate-900 font-bold">
+                            <i data-lucide="bell-ring" class="w-5 h-5 text-blue-600"></i>
+                            <span>Cảnh Báo & Âm Thanh</span>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>Bù trừ tốc độ cảnh báo (Offset)</span>
+                                <span id="val-offset">0 km/h</span>
+                            </div>
+                            <input type="range" id="cfg-offset" min="-10" max="15" value="0" oninput="updateVal('offset')" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                            <p class="text-[11px] text-slate-400 mt-1">Ví dụ đặt +5 km/h: Biển 60 thì chạy 66 km/h mới bắt đầu báo bíp.</p>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <span class="text-sm text-slate-700 font-medium">Kêu bíp khi đổi biển báo tốc độ</span>
+                            <input type="checkbox" id="cfg-beep-limit" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2">
+                            <span class="text-sm text-slate-700 font-medium">Kêu bíp dồn dập khi quá tốc độ</span>
+                            <input type="checkbox" id="cfg-beep-speed" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Chữ Chào Mừng / Logo khởi động</label>
+                            <input type="text" id="cfg-welcome" value="VIETMAP HUD PRO" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button onclick="readBleConfig()" class="px-5 py-2.5 rounded-xl font-semibold text-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition">
+                        Đọc Lại Từ HUD
+                    </button>
+                    <button onclick="saveBleConfig()" class="px-6 py-2.5 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 transition flex items-center space-x-2">
+                        <i data-lucide="save" class="w-4 h-4"></i>
+                        <span>Lưu Cấu Hình Vào HUD</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- =================================================================== -->
+            <!-- 3. TAB TRÌNH GIẢ LẬP HUD (SIMULATOR) -->
+            <!-- =================================================================== -->
+            <section id="pane-simulator" class="space-y-6 hidden">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Trình Giả Lập Màn Hình HUD Thời Gian Thực</h2>
+                    <p class="text-slate-500 mt-1">Mô phỏng dữ liệu Vietmap App gửi qua Bluetooth và trực quan hóa giao diện hiển thị của màn hình.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    <!-- Left: Control Panel -->
+                    <div class="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 space-y-5 shadow-sm">
+                        <h4 class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                            <i data-lucide="sliders" class="w-4 h-4 text-blue-600"></i>
+                            <span>Bảng Điều Khiển Dữ Liệu</span>
+                        </h4>
+
+                        <!-- Speed Slider -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>Tốc độ xe hiện tại</span>
+                                <span id="sim-spd-val" class="text-blue-600 font-bold text-sm">65 km/h</span>
+                            </div>
+                            <input type="range" id="sim-spd" min="0" max="140" value="65" oninput="updateSimUi()" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        </div>
+
+                        <!-- Speed Limit -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Biển báo giới hạn tốc độ</label>
+                            <div class="grid grid-cols-5 gap-2">
+                                <button type="button" onclick="setSimLimit(50)" class="sim-limit-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">50</button>
+                                <button type="button" onclick="setSimLimit(60)" class="sim-limit-btn py-1.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-xs font-bold text-blue-600">60</button>
+                                <button type="button" onclick="setSimLimit(80)" class="sim-limit-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">80</button>
+                                <button type="button" onclick="setSimLimit(100)" class="sim-limit-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">100</button>
+                                <button type="button" onclick="setSimLimit(120)" class="sim-limit-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">120</button>
+                            </div>
+                        </div>
+
+                        <!-- Turn Direction -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Hướng rẽ & Khoảng cách</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button type="button" onclick="setSimTurn(8, '<-')" class="sim-turn-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">Rẽ trái</button>
+                                <button type="button" onclick="setSimTurn(1, '^^')" class="sim-turn-btn py-1.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-xs font-bold text-blue-600">Đi thẳng</button>
+                                <button type="button" onclick="setSimTurn(3, '->')" class="sim-turn-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">Rẽ phải</button>
+                                <button type="button" onclick="setSimTurn(10, 'O')" class="sim-turn-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500">Bùng binh</button>
+                            </div>
+                        </div>
+
+                        <!-- Distance Slider -->
+                        <div>
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>Khoảng cách đến ngã rẽ</span>
+                                <span id="sim-dst-val" class="font-mono text-xs text-slate-600">350 m</span>
+                            </div>
+                            <input type="range" id="sim-dst" min="50" max="3000" step="50" value="350" oninput="updateSimUi()" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                        </div>
+
+                        <!-- Camera Alert Options -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Cảnh báo giao thông</label>
+                            <select id="sim-alert-select" onchange="updateSimUi()" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 bg-slate-50 outline-none">
+                                <option value="">Không có cảnh báo</option>
+                                <option value="Camera phạt nguội">Camera phạt nguội</option>
+                                <option value="Bắn tốc độ phía trước">Bắn tốc độ phía trước</option>
+                                <option value="Vào khu dân cư (60)">Vào khu dân cư (60)</option>
+                                <option value="Hết khu dân cư (80)">Hết khu dân cư (80)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Right: Virtual Screen Displays -->
+                    <div class="lg:col-span-7 flex flex-col items-center space-y-6">
+                        <!-- Toggle Screen Shape Button -->
+                        <div class="inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200">
+                            <button onclick="setSimScreenType('cyd')" id="btn-sim-cyd" class="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition">
+                                Màn Hình CYD 2.4" (320x240)
+                            </button>
+                            <button onclick="setSimScreenType('round')" id="btn-sim-round" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+                                Màn Hình Tròn 1.28" (240x240)
+                            </button>
+                        </div>
+
+                        <!-- SCREEN 1: CYD 320x240 -->
+                        <div id="sim-box-cyd" class="hud-screen-cyd p-3 flex flex-col justify-between">
+                            <!-- Top Status Bar -->
+                            <div class="flex items-center justify-between text-[11px] text-slate-300 border-b border-slate-800 pb-1">
+                                <span class="flex items-center space-x-1.5 text-emerald-400 font-bold">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                    <span>BLE: VIETMAP_HUD</span>
+                                </span>
+                                <span class="font-mono text-slate-300">14:35 | ETA: 15:10</span>
+                            </div>
+
+                            <!-- Middle Main HUD -->
+                            <div class="flex items-center justify-between px-2">
+                                <!-- Speed Limit Sign Circle -->
+                                <div class="w-16 h-16 rounded-full border-4 border-red-600 bg-white flex items-center justify-center text-black font-extrabold text-2xl shadow-lg">
+                                    <span id="sim-sign-val">60</span>
+                                </div>
+
+                                <!-- Speed Big Number -->
+                                <div class="text-center">
+                                    <div id="sim-speed-text" class="text-red-500 font-black text-7xl font-mono tracking-tight leading-none drop-shadow">
+                                        65
+                                    </div>
+                                    <div class="text-xs text-slate-400 font-bold tracking-widest mt-1">km/h</div>
+                                </div>
+
+                                <!-- Turn Arrow & Distance -->
+                                <div class="text-center w-16">
+                                    <div id="sim-arrow-text" class="text-cyan-400 font-extrabold text-3xl">^^</div>
+                                    <div id="sim-dist-text" class="text-white text-xs font-bold font-mono mt-1">350m</div>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Alert / Street Banner -->
+                            <div id="sim-banner" class="bg-red-600 text-white text-xs font-bold py-1.5 px-3 rounded text-center tracking-wide">
+                                Quá tốc độ giới hạn 60 km/h!
+                            </div>
+                        </div>
+
+                        <!-- SCREEN 2: ROUND 240x240 -->
+                        <div id="sim-box-round" class="hud-screen-round p-3 flex flex-col items-center justify-between hidden">
+                            <!-- Top Limit Sign -->
+                            <div class="w-11 h-11 rounded-full border-[3px] border-red-600 bg-white flex items-center justify-center text-black font-extrabold text-sm shadow">
+                                <span id="sim-round-sign">60</span>
+                            </div>
+
+                            <!-- Center Big Speed -->
+                            <div class="text-center">
+                                <div id="sim-round-speed" class="text-red-500 font-black text-6xl font-mono leading-none">
+                                    65
+                                </div>
+                                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">km/h</div>
+                            </div>
+
+                            <!-- Bottom Turn & Distance -->
+                            <div class="text-center pb-2">
+                                <div id="sim-round-arrow" class="text-cyan-400 font-black text-xl leading-none">^^</div>
+                                <div id="sim-round-dist" class="text-white text-[11px] font-bold font-mono">350 m</div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-slate-400 text-center">Giao diện đồ họa giả lập chính xác theo pixel của màn hình vật lý thực tế.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =================================================================== -->
+            <!-- 4. TAB HƯỚNG DẪN & SƠ ĐỒ ĐẤU NỐI (GUIDE) -->
+            <!-- =================================================================== -->
+            <section id="pane-guide" class="space-y-6 hidden">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Sơ Đồ Phần Cứng & Hướng Dẫn Sử Dụng</h2>
+                    <p class="text-slate-500 mt-1">Chi tiết chân kết nối và các bước cấu hình để kết nối với ứng dụng dẫn đường trên điện thoại.</p>
+                </div>
+
+                <!-- Table Pinout -->
+                <div class="overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-sm">
+                    <table class="w-full text-left text-sm text-slate-700">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase font-bold text-slate-600">
+                            <tr>
+                                <th class="p-4">Chức năng</th>
+                                <th class="p-4">ESP32-2432S024 (CYD 2.4")</th>
+                                <th class="p-4">ESP32-2424S012 (Round 1.28")</th>
+                                <th class="p-4">Mô tả chi tiết</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">Màn hình LCD</td>
+                                <td class="p-4 font-mono text-blue-600 font-bold">ILI9341 SPI (320x240)</td>
+                                <td class="p-4 font-mono text-emerald-600 font-bold">GC9A01 SPI (240x240)</td>
+                                <td class="p-4 text-xs text-slate-500">Giao tiếp SPI tốc độ cao 40MHz</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">SPI SCLK</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 14</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 14</td>
+                                <td class="p-4 text-xs text-slate-500">Xung nhịp Clock</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">SPI MOSI</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 13</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 13</td>
+                                <td class="p-4 text-xs text-slate-500">Dữ liệu truyền từ ESP32 sang màn hình</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">TFT CS / DC</td>
+                                <td class="p-4 font-mono text-slate-800">CS=15, DC=2</td>
+                                <td class="p-4 font-mono text-slate-800">CS=15, DC=2</td>
+                                <td class="p-4 text-xs text-slate-500">Chọn chip & điều khiển Lệnh/Dữ liệu</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">Đèn nền (Backlight)</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 21 (PWM)</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 21 (PWM)</td>
+                                <td class="p-4 text-xs text-slate-500">Điều chỉnh độ sáng tự động / ngày / đêm</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">Còi Buzzer cảnh báo</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 26 (Tích hợp sẵn)</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 25 (Hàn ngoài)</td>
+                                <td class="p-4 text-xs text-slate-500">Bíp cảnh báo quá tốc độ & đổi biển báo</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-semibold text-slate-900">Cảm biến quang trở</td>
+                                <td class="p-4 font-mono text-slate-800">GPIO 34 (LDR có sẵn)</td>
+                                <td class="p-4 font-mono text-slate-800">-</td>
+                                <td class="p-4 text-xs text-slate-500">Tự giảm sáng khi đi trời tối/hầm</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Steps to connect -->
+                <div class="bg-blue-50/60 border border-blue-200/80 rounded-2xl p-6">
+                    <h4 class="font-bold text-blue-900 mb-3 text-base flex items-center space-x-2">
+                        <i data-lucide="smartphone" class="w-5 h-5 text-blue-600"></i>
+                        <span>Cách Kết Nối Với App Vietmap Live / Mapviet Trên Điện Thoại</span>
+                    </h4>
+                    <ol class="space-y-2 text-sm text-blue-800 list-decimal list-inside leading-relaxed">
+                        <li>Bật Bluetooth trên điện thoại iPhone hoặc Android.</li>
+                        <li>Cấp nguồn cho mạch ESP32 qua cổng Type-C / sạc tẩu trên xe hơi. Màn hình khởi động sẽ hiện chữ <strong>VIETMAP HUD</strong> và báo <strong>BLE Ready</strong>.</li>
+                        <li>Mở ứng dụng <strong>Vietmap Live</strong> (hoặc ứng dụng Mapviet), vào mục <strong>Cài đặt</strong> &rarr; <strong>Kết nối HUD</strong> &rarr; Chọn thiết bị <strong>VIETMAP_HUD</strong>.</li>
+                        <li>Khi kết nối thành công, màn hình sẽ tự động hiển thị tốc độ, giới hạn tốc độ và hướng dẫn chỉ đường thời gian thực!</li>
+                    </ol>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- UI Interaction Scripts -->
+    <script>
+        // Init Lucide Icons
+        lucide.createIcons();
+
+        let currentHw = 'esp32_2432s024';
+        let simLimit = 60;
+        let simTurnCode = 1;
+        let simTurnArrow = '^^';
+        let bleDevice = null;
+        let bleServer = null;
+        let bleCharWrite = null;
+        let bleCharNotify = null;
+
+        const SERVICE_UUID = "8a7e0001-4d6e-4c48-9a9d-484c504c0001";
+        const WRITE_UUID   = "8a7e0002-4d6e-4c48-9a9d-484c504c0001";
+        const NOTIFY_UUID  = "8a7e0003-4d6e-4c48-9a9d-484c504c0001";
+
+        // Switch Tab
+        function switchTab(tabId) {
+            ['flash', 'ble-config', 'simulator', 'guide'].forEach(t => {
+                const pane = document.getElementById('pane-' + t);
+                const btn = document.getElementById('tab-btn-' + t);
+                if (t === tabId) {
+                    pane.classList.remove('hidden');
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all bg-blue-600 text-white shadow-md shadow-blue-600/20";
+                } else {
+                    pane.classList.add('hidden');
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-medium text-sm transition-all text-slate-400 hover:text-white hover:bg-slate-800";
+                }
+            });
+            lucide.createIcons();
+        }
+
+        // Hardware selector
+        function selectHardware(hw) {
+            currentHw = hw;
+            const cardCyd = document.getElementById('card-hw-cyd');
+            const cardRound = document.getElementById('card-hw-round');
+            const badgeCyd = document.getElementById('badge-cyd');
+            const badgeRound = document.getElementById('badge-round');
+            const label = document.getElementById('selected-hw-label');
+            const espBtn = document.getElementById('esp-btn');
+
+            if (hw === 'esp32_2432s024') {
+                cardCyd.className = "cursor-pointer border-2 border-blue-600 bg-blue-50/40 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden";
+                cardRound.className = "cursor-pointer border-2 border-slate-200 bg-white hover:border-slate-300 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden";
+                badgeCyd.classList.remove('hidden');
+                badgeRound.classList.add('hidden');
+                label.innerText = "Thiết bị: ESP32-2432S024 (CYD 2.4\")";
+                espBtn.setAttribute('manifest', 'manifest_2432s024.json');
+            } else {
+                cardRound.className = "cursor-pointer border-2 border-blue-600 bg-blue-50/40 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden";
+                cardCyd.className = "cursor-pointer border-2 border-slate-200 bg-white hover:border-slate-300 rounded-2xl p-6 transition-all shadow-sm relative overflow-hidden";
+                badgeRound.classList.remove('hidden');
+                badgeCyd.classList.add('hidden');
+                label.innerText = "Thiết bị: ESP32-2424S012 (Round 1.28\")";
+                espBtn.setAttribute('manifest', 'manifest_2424s012.json');
+            }
+        }
+
+        // Simulator controls
+        function updateSimUi() {
+            const spd = parseInt(document.getElementById('sim-spd').value);
+            const dst = parseInt(document.getElementById('sim-dst').value);
+            const alertText = document.getElementById('sim-alert-select').value;
+
+            document.getElementById('sim-spd-val').innerText = spd + " km/h";
+            document.getElementById('sim-dst-val').innerText = (dst >= 1000) ? (dst/1000).toFixed(1) + " km" : dst + " m";
+
+            // Update CYD Screen
+            const speedText = document.getElementById('sim-speed-text');
+            const banner = document.getElementById('sim-banner');
+            speedText.innerText = spd;
+            document.getElementById('sim-sign-val').innerText = simLimit;
+            document.getElementById('sim-arrow-text').innerText = simTurnArrow;
+            document.getElementById('sim-dist-text').innerText = (dst >= 1000) ? (dst/1000).toFixed(1) + "km" : dst + "m";
+
+            // Update Round Screen
+            document.getElementById('sim-round-speed').innerText = spd;
+            document.getElementById('sim-round-sign').innerText = simLimit;
+            document.getElementById('sim-round-arrow').innerText = simTurnArrow;
+            document.getElementById('sim-round-dist').innerText = (dst >= 1000) ? (dst/1000).toFixed(1) + " km" : dst + " m";
+
+            // Overspeed check
+            const isOverspeed = spd > simLimit;
+            if (isOverspeed) {
+                speedText.className = "text-red-500 font-black text-7xl font-mono tracking-tight leading-none drop-shadow animate-pulse";
+                document.getElementById('sim-round-speed').className = "text-red-500 font-black text-6xl font-mono leading-none animate-pulse";
+                banner.innerText = "CẢNH BÁO QUÁ TỐC ĐỘ " + simLimit + " KM/H!";
+                banner.className = "bg-red-600 text-white text-xs font-bold py-1.5 px-3 rounded text-center tracking-wide animate-pulse";
+            } else {
+                speedText.className = "text-emerald-400 font-black text-7xl font-mono tracking-tight leading-none drop-shadow";
+                document.getElementById('sim-round-speed').className = "text-emerald-400 font-black text-6xl font-mono leading-none";
+                if (alertText) {
+                    banner.innerText = alertText;
+                    banner.className = "bg-amber-600 text-white text-xs font-bold py-1.5 px-3 rounded text-center tracking-wide";
+                } else {
+                    banner.innerText = "Quốc Lộ 1A - Tuyến Tránh Biên Hòa";
+                    banner.className = "bg-slate-900 text-cyan-300 text-xs font-semibold py-1.5 px-3 rounded text-center tracking-wide";
+                }
+            }
+        }
+
+        function setSimLimit(lim) {
+            simLimit = lim;
+            document.querySelectorAll('.sim-limit-btn').forEach(b => {
+                if (parseInt(b.innerText) === lim) {
+                    b.className = "sim-limit-btn py-1.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-xs font-bold text-blue-600";
+                } else {
+                    b.className = "sim-limit-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500";
+                }
+            });
+            updateSimUi();
+        }
+
+        function setSimTurn(code, arrow) {
+            simTurnCode = code;
+            simTurnArrow = arrow;
+            document.querySelectorAll('.sim-turn-btn').forEach(b => {
+                b.className = "sim-turn-btn py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-500";
+            });
+            event.target.className = "sim-turn-btn py-1.5 rounded-lg border-2 border-blue-600 bg-blue-50 text-xs font-bold text-blue-600";
+            updateSimUi();
+        }
+
+        function setSimScreenType(type) {
+            const btnCyd = document.getElementById('btn-sim-cyd');
+            const btnRound = document.getElementById('btn-sim-round');
+            const boxCyd = document.getElementById('sim-box-cyd');
+            const boxRound = document.getElementById('sim-box-round');
+
+            if (type === 'cyd') {
+                btnCyd.className = "px-4 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition";
+                btnRound.className = "px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
+                boxCyd.classList.remove('hidden');
+                boxRound.classList.add('hidden');
+            } else {
+                btnRound.className = "px-4 py-1.5 rounded-lg text-xs font-semibold bg-white text-blue-600 shadow-sm transition";
+                btnCyd.className = "px-4 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
+                boxRound.classList.remove('hidden');
+                boxCyd.classList.add('hidden');
+            }
+        }
+
+        function updateVal(id) {
+            const el = document.getElementById('cfg-' + id);
+            const valEl = document.getElementById('val-' + id);
+            if (id === 'offset') {
+                valEl.innerText = (el.value > 0 ? "+" : "") + el.value + " km/h";
+            } else {
+                valEl.innerText = el.value + "%";
+            }
+        }
+
+        // Web Bluetooth Logic
+        async function toggleBleConnection() {
+            if (bleDevice && bleDevice.gatt.connected) {
+                bleDevice.gatt.disconnect();
+                setBleStatus(false);
+                return;
+            }
+
+            try {
+                setBleStatus("connecting");
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { name: 'VIETMAP_HUD' },
+                        { name: 'MAPVIET' },
+                        { services: [SERVICE_UUID] }
+                    ],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                bleDevice.addEventListener('gattserverdisconnected', () => setBleStatus(false));
+                bleServer = await bleDevice.gatt.connect();
+                const service = await bleServer.getPrimaryService(SERVICE_UUID);
+                bleCharWrite = await service.getCharacteristic(WRITE_UUID);
+                bleCharNotify = await service.getCharacteristic(NOTIFY_UUID);
+
+                await bleCharNotify.startNotifications();
+                bleCharNotify.addEventListener('characteristicvaluechanged', handleBleNotification);
+
+                setBleStatus(true);
+                readBleConfig();
+            } catch (err) {
+                console.error("BLE Error:", err);
+                setBleStatus(false, "Không thể kết nối Bluetooth: " + err.message);
+            }
+        }
+
+        function setBleStatus(status, errText) {
+            const dot = document.getElementById('ble-dot');
+            const text = document.getElementById('ble-status-text');
+            const btn = document.getElementById('ble-btn-text');
+
+            if (status === true) {
+                dot.className = "w-3 h-3 rounded-full bg-emerald-500 animate-pulse";
+                text.innerText = "Đã kết nối với VIETMAP HUD (" + bleDevice.name + ")";
+                btn.innerText = "Ngắt Kết Nối Bluetooth";
+            } else if (status === "connecting") {
+                dot.className = "w-3 h-3 rounded-full bg-amber-500 animate-ping";
+                text.innerText = "Đang kết nối Bluetooth...";
+                btn.innerText = "Đang kết nối...";
+            } else {
+                dot.className = "w-3 h-3 rounded-full bg-slate-400";
+                text.innerText = errText || "Chưa kết nối thiết bị Bluetooth nào.";
+                btn.innerText = "Quét & Kết Nối BLE HUD";
+            }
+        }
+
+        async function readBleConfig() {
+            if (!bleCharWrite) return;
+            const cmd = new TextEncoder().encode('{"type":"get_cfg"}\n');
+            await bleCharWrite.writeValue(cmd);
+        }
+
+        async function saveBleConfig() {
+            if (!bleCharWrite) {
+                alert("Vui lòng kết nối Bluetooth tới HUD trước khi lưu cấu hình!");
+                return;
+            }
+
+            const cfg = {
+                type: "set_cfg",
+                bright_day: parseInt(document.getElementById('cfg-bright-day').value),
+                bright_night: parseInt(document.getElementById('cfg-bright-night').value),
+                auto_bright: document.getElementById('cfg-auto-bright').checked,
+                rotation: parseInt(document.getElementById('cfg-rotation').value),
+                offset: parseInt(document.getElementById('cfg-offset').value),
+                beep_limit: document.getElementById('cfg-beep-limit').checked,
+                beep_speed: document.getElementById('cfg-beep-speed').checked,
+                welcome: document.getElementById('cfg-welcome').value
+            };
+
+            const data = new TextEncoder().encode(JSON.stringify(cfg) + "\n");
+            await bleCharWrite.writeValue(data);
+            alert("Đã lưu cấu hình mới thành công vào HUD!");
+        }
+
+        function handleBleNotification(event) {
+            const raw = new TextDecoder().decode(event.target.value);
+            try {
+                const doc = JSON.parse(raw);
+                if (doc.type === "cfg_resp") {
+                    if (doc.bright_day) document.getElementById('cfg-bright-day').value = doc.bright_day;
+                    if (doc.bright_night) document.getElementById('cfg-bright-night').value = doc.bright_night;
+                    if (doc.offset !== undefined) document.getElementById('cfg-offset').value = doc.offset;
+                    if (doc.welcome) document.getElementById('cfg-welcome').value = doc.welcome;
+                    updateVal('bright-day');
+                    updateVal('bright-night');
+                    updateVal('offset');
+                }
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>

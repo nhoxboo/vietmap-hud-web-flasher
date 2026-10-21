@@ -1,0 +1,16 @@
+{
+  "name": "VIETMAP HUD PRO - ESP32-2424S012",
+  "version": "1.3.6-pro",
+  "home_assistant_domain": "esphome",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "firmwares/esp32_2424s012/bootloader.bin", "offset": 4096 },
+        { "path": "firmwares/esp32_2424s012/partitions.bin", "offset": 32768 },
+        { "path": "firmwares/esp32_2424s012/firmware.bin", "offset": 65536 }
+      ]
+    }
+  ]
+}
