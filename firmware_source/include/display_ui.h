@@ -2,9 +2,20 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
+#include <TJpg_Decoder.h>
 #include "config_pins.h"
 #include "config_manager.h"
 #include "hud_data.h"
+#include "assets_icons.h"
+
+static TFT_eSPI tft = TFT_eSPI();
+
+// Callback cho TJpg_Decoder để đẩy pixel RGB565 ra TFT_eSPI
+static bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap) {
+    if (y >= tft.height()) return 0;
+    tft.pushImage(x, y, w, h, bitmap);
+    return 1;
+}
 
 class DisplayUI {
 public:
@@ -14,7 +25,7 @@ public:
     }
 
     void begin() {
-        Serial.printf("[UI] Initializing Display for %s...\n", BOARD_NAME);
+        Serial.printf("[UI] Initializing Display with TJPGD Assets for %s...\n", BOARD_NAME);
 
         #if TFT_BL >= 0
         pinMode(TFT_BL, OUTPUT);
@@ -28,6 +39,11 @@ public:
         tft.setRotation(ConfigManager::getInstance().get().display_rotation);
         #endif
         tft.fillScreen(TFT_BLACK);
+
+        // Khởi tạo bộ giải nén ảnh JPEG TJpgDec
+        TJpgDec.setJpgScale(1);
+        TJpgDec.setSwapBytes(true); // Đảo byte màu cho chuẩn TFT_eSPI
+        TJpgDec.setCallback(tft_output);
 
         drawBootScreen();
     }
@@ -96,7 +112,6 @@ public:
     }
 
 private:
-    TFT_eSPI tft = TFT_eSPI();
     int16_t last_speed = -99;
     int16_t last_limit = -99;
     uint8_t last_turn = 255;
@@ -295,6 +310,26 @@ private:
     }
 
     void drawSpeedLimitSign(int x, int y, int r, int limit) {
+        // Ánh xạ giới hạn tốc độ sang icon JPEG chuẩn của Vietmap
+        int iconIdx = -1;
+        if (limit == 20) iconIdx = 29;
+        else if (limit == 30) iconIdx = 30;
+        else if (limit == 40) iconIdx = 31;
+        else if (limit == 50) iconIdx = 32;
+        else if (limit == 60) iconIdx = 33;
+        else if (limit == 70) iconIdx = 34;
+        else if (limit == 80) iconIdx = 35;
+        else if (limit == 90) iconIdx = 36;
+        else if (limit == 100) iconIdx = 37;
+        else if (limit == 120) iconIdx = 38;
+
+        if (iconIdx >= 0 && iconIdx < HUD_ICON_COUNT) {
+            // Vẽ trực tiếp bằng file ảnh JPEG gốc 60x60
+            TJpgDec.drawJpg(x, y, HUD_ICONS[iconIdx].data, HUD_ICONS[iconIdx].size);
+            return;
+        }
+
+        // Fallback: Vẽ vector tròn nếu là giá trị tốc độ lạ
         tft.fillCircle(x + r, y + r, r, TFT_RED);
         tft.fillCircle(x + r, y + r, r - 5, TFT_WHITE);
         tft.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -309,25 +344,34 @@ private:
 
     void drawTurnIconAndDist(int x, int y, uint8_t turn, uint32_t dist) {
         tft.fillRect(x, y, 75, 90, TFT_BLACK);
-        tft.setTextColor(TFT_CYAN, TFT_BLACK);
 
-        String arrow = "";
-        if (turn == TURN_LEFT || turn == TURN_SLIGHT_LEFT || turn == TURN_SHARP_LEFT) arrow = "<-";
-        else if (turn == TURN_RIGHT || turn == TURN_SLIGHT_RIGHT || turn == TURN_SHARP_RIGHT) arrow = "->";
-        else if (turn == TURN_STRAIGHT) arrow = "^^";
-        else if (turn == TURN_ROUNDABOUT) arrow = "O";
+        // Ánh xạ mã rẽ sang icon JPEG gốc của Vietmap (icon 0..15)
+        int iconIdx = -1;
+        if (turn >= 1 && turn <= 12) {
+            iconIdx = turn - 1; // Map vào bộ icon JPEG
+        }
 
-        tft.drawCentreString(arrow, x + 35, y + 5, 4);
+        if (iconIdx >= 0 && iconIdx < HUD_ICON_COUNT) {
+            TJpgDec.drawJpg(x + 5, y, HUD_ICONS[iconIdx].data, HUD_ICONS[iconIdx].size);
+        } else {
+            tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            String arrow = "";
+            if (turn == TURN_LEFT || turn == TURN_SLIGHT_LEFT || turn == TURN_SHARP_LEFT) arrow = "<-";
+            else if (turn == TURN_RIGHT || turn == TURN_SLIGHT_RIGHT || turn == TURN_SHARP_RIGHT) arrow = "->";
+            else if (turn == TURN_STRAIGHT) arrow = "^^";
+            else if (turn == TURN_ROUNDABOUT) arrow = "O";
+            tft.drawCentreString(arrow, x + 35, y + 5, 4);
+        }
 
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         if (dist >= 1000) {
             char buf[16];
             snprintf(buf, sizeof(buf), "%.1f km", dist / 1000.0f);
-            tft.drawCentreString(buf, x + 35, y + 45, 2);
+            tft.drawCentreString(buf, x + 35, y + 65, 2);
         } else {
             char buf[16];
             snprintf(buf, sizeof(buf), "%u m", dist);
-            tft.drawCentreString(buf, x + 35, y + 45, 2);
+            tft.drawCentreString(buf, x + 35, y + 65, 2);
         }
     }
 };
