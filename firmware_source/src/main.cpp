@@ -23,13 +23,7 @@ void setup() {
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     #endif
 
-    // 2. Khởi tạo Còi Buzzer
-    #if BUZZER_PIN >= 0
-    pinMode(BUZZER_PIN, OUTPUT);
-    digitalWrite(BUZZER_PIN, LOW);
-    #endif
-
-    // 3. Khởi tạo LED RGB nếu có
+    // 2. Khởi tạo LED RGB nếu có
     #if LED_RED_PIN >= 0
     pinMode(LED_RED_PIN, OUTPUT);
     pinMode(LED_GREEN_PIN, OUTPUT);
@@ -39,18 +33,16 @@ void setup() {
     digitalWrite(LED_BLUE_PIN, HIGH);
     #endif
 
-    // 4. Khởi tạo Filesystem & Cấu hình
+    // 3. Khởi tạo Filesystem & Cấu hình
     ConfigManager::getInstance().begin();
 
-    // 5. Khởi tạo Màn hình TFT
+    // 4. Khởi tạo Màn hình TFT (100% Backlight)
     DisplayUI::getInstance().begin();
 
-    // 6. Khởi tạo BLE Server VIETMAP_HUD (nhẹ, tối ưu)
+    // 5. Khởi tạo BLE Server VIETMAP_HUD & WAZE
     BleVietmapServer::getInstance().begin(&g_sysState);
 
-    // Kêu bíp báo hiệu sẵn sàng
-    DisplayUI::getInstance().beep(2000, 150);
-    Serial.println("[System] Ready for navigation!");
+    Serial.println("[System] Ready for navigation (Max Brightness, No Buzzer/LDR)!");
 }
 
 void loop() {
