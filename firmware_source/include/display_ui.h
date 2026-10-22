@@ -7,6 +7,7 @@
 #include "config_manager.h"
 #include "hud_data.h"
 #include "assets_icons.h"
+#include "mochi_anim.h"
 
 // Bảng tra cứu 82 icon gốc trích xuất trực tiếp từ IROM offset 0x2606b0 của Firmware Vietmap HUD
 // Ánh xạ chính xác 100% mã hướng rẽ `trn`, cảnh báo `alrs` và biển báo `lim` sang 43 file ảnh JPEG gốc
@@ -182,6 +183,8 @@ private:
     uint32_t last_overspeed_beep = 0;
     bool     turn_notified = false;
     uint8_t  screen_mode = 0;
+    uint8_t  mochi_cur_frame = 0;
+    uint32_t last_anim_frame_time = 0;
 
     DisplayUI() {}
 
@@ -310,9 +313,58 @@ private:
     }
 
     // =========================================================================
-    // 3. MÀN HÌNH CHỜ STANDBY (KHI CHƯA DẪN ĐƯỜNG)
+    // 3. MÀN HÌNH CHỜ STANDBY (MOCHI ANIMATION / ĐỒNG HỒ / TẮT MÀN HÌNH)
     // =========================================================================
     void renderStandbyScreen(const SystemState& state) {
+        uint8_t mode = ConfigManager::getInstance().get().sleep_screen_mode;
+
+        // Chế độ 2: Tắt màn hình / Màn hình đen
+        if (mode == 2) {
+            if (last_mode != 0) {
+                tft.fillScreen(TFT_BLACK);
+                last_mode = 0;
+            }
+            return;
+        }
+
+        // Chế độ 0: Mochi Animation (Hoạt ảnh Mochi 160x80)
+        if (mode == 0) {
+            if (last_mode != 0) {
+                tft.fillScreen(TFT_BLACK);
+                last_mode = 0;
+                #if SCREEN_IS_ROUND
+                tft.drawCircle(120, 120, 118, TFT_CYAN);
+                #else
+                tft.setTextColor(TFT_CYAN, TFT_BLACK);
+                tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 160, 20, 4);
+                #endif
+            }
+
+            uint32_t now = millis();
+            if (now - last_anim_frame_time >= 65) { // ~15 FPS
+                last_anim_frame_time = now;
+                mochi_cur_frame = (mochi_cur_frame + 1) % MOCHI_FRAME_COUNT;
+
+                #if SCREEN_IS_ROUND
+                // Màn hình tròn 240x240: Vẽ Mochi ở tâm (x=40, y=80)
+                TJpgDec.drawJpg(40, 75, MOCHI_FRAMES[mochi_cur_frame].data, MOCHI_FRAMES[mochi_cur_frame].size);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.drawCentreString(state.current_time_str, 120, 35, 4);
+                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.drawCentreString("MOCHI", 120, 175, 2);
+                #else
+                // Màn hình chữ nhật 320x240: Vẽ Mochi ở tâm (x=80, y=65)
+                TJpgDec.drawJpg(80, 65, MOCHI_FRAMES[mochi_cur_frame].data, MOCHI_FRAMES[mochi_cur_frame].size);
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.drawCentreString(state.current_time_str, 160, 165, 4);
+                tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+                tft.drawCentreString("Dang cho Vietmap / Waze...", 160, 205, 2);
+                #endif
+            }
+            return;
+        }
+
+        // Chế độ 1: Đồng hồ số lớn (Digital Clock)
         if (last_mode != 0) {
             tft.fillScreen(TFT_BLACK);
             last_mode = 0;
@@ -325,14 +377,14 @@ private:
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
         tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 120, 140, 4);
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.drawCentreString("Dang cho Vietmap...", 120, 175, 2);
+        tft.drawCentreString("Dang cho Vietmap / Waze...", 120, 175, 2);
         #else
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.drawCentreString(state.current_time_str, 160, 50, 8);
         tft.setTextColor(TFT_CYAN, TFT_BLACK);
         tft.drawCentreString(ConfigManager::getInstance().get().welcome_text, 160, 135, 4);
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.drawCentreString("Vui long mo App Vietmap Live tren Dien Thoai", 160, 175, 2);
+        tft.drawCentreString("Vui long mo App Vietmap Live hoac Waze", 160, 175, 2);
         tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
         tft.drawCentreString("Bluetooth ID: VIETMAP_HUD", 160, 205, 2);
         #endif

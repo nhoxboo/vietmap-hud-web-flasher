@@ -310,6 +310,24 @@
                                 <option value="2">Dọc ngược (Rotation 2)</option>
                             </select>
                         </div>
+
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-700 font-medium">Chế độ Màn hình chờ (Screensaver)</span>
+                            <select id="cfg-sleep-mode" class="text-xs font-semibold border border-blue-200 rounded-lg px-2.5 py-1.5 bg-blue-50/50 text-blue-800">
+                                <option value="0">🐰 Hoạt ảnh Mochi (Mochi Animation)</option>
+                                <option value="1">⏰ Đồng hồ số lớn (Digital Clock)</option>
+                                <option value="2">⬛ Tắt màn hình (Black / Standby)</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-700 font-medium">Nguồn Dẫn Đường (Nav Source)</span>
+                            <select id="cfg-nav-source" class="text-xs font-semibold border border-blue-200 rounded-lg px-2.5 py-1.5 bg-blue-50/50 text-blue-800">
+                                <option value="0">🔄 Tự Động (Vietmap Live & Waze Hub)</option>
+                                <option value="1">🗺️ VIETMAP Live</option>
+                                <option value="2">🚗 Waze Navigation Hub</option>
+                            </select>
+                        </div>
                     </div>
 
                     <!-- Alerts & Sounds Card -->
@@ -820,6 +838,8 @@
                 bright_night: parseInt(document.getElementById('cfg-bright-night').value),
                 auto_bright: document.getElementById('cfg-auto-bright').checked,
                 rotation: parseInt(document.getElementById('cfg-rotation').value),
+                sleep_mode: parseInt(document.getElementById('cfg-sleep-mode').value),
+                nav_source: parseInt(document.getElementById('cfg-nav-source').value),
                 offset: parseInt(document.getElementById('cfg-offset').value),
                 beep_limit: document.getElementById('cfg-beep-limit').checked,
                 beep_speed: document.getElementById('cfg-beep-speed').checked,
@@ -840,6 +860,12 @@
                     if (doc.bright_night) document.getElementById('cfg-bright-night').value = doc.bright_night;
                     if (doc.offset !== undefined) document.getElementById('cfg-offset').value = doc.offset;
                     if (doc.welcome) document.getElementById('cfg-welcome').value = doc.welcome;
+                    if (doc.sleep_mode !== undefined) document.getElementById('cfg-sleep-mode').value = doc.sleep_mode;
+                    if (doc.nav_source !== undefined) document.getElementById('cfg-nav-source').value = doc.nav_source;
+                    if (doc.rotation !== undefined) document.getElementById('cfg-rotation').value = doc.rotation;
+                    if (doc.auto_bright !== undefined) document.getElementById('cfg-auto-bright').checked = doc.auto_bright;
+                    if (doc.beep_limit !== undefined) document.getElementById('cfg-beep-limit').checked = doc.beep_limit;
+                    if (doc.beep_speed !== undefined) document.getElementById('cfg-beep-speed').checked = doc.beep_speed;
                     updateVal('bright-day');
                     updateVal('bright-night');
                     updateVal('offset');

@@ -129,24 +129,43 @@ private:
             return;
         }
 
-        // 3. Giải mã gói tin Navigation thời gian thực từ Vietmap App
+        // 3. Giải mã gói tin Navigation thời gian thực từ Vietmap App HOẶC Waze Hub
         StaticJsonDocument<1024> doc;
         DeserializationError err = deserializeJson(doc, data, len);
         if (err || !state) return;
 
+        // --- VIETMAP LIVE HOẶC WAZE HUB DATA PARSER ---
         if (doc.containsKey("spd")) state->nav.speed = doc["spd"].as<int16_t>();
+        else if (doc.containsKey("speed")) state->nav.speed = doc["speed"].as<int16_t>();
+
         if (doc.containsKey("lim")) state->nav.speed_limit = doc["lim"].as<int16_t>();
+        else if (doc.containsKey("limit")) state->nav.speed_limit = doc["limit"].as<int16_t>();
+        else if (doc.containsKey("speedLimit")) state->nav.speed_limit = doc["speedLimit"].as<int16_t>();
+
         if (doc.containsKey("nav")) state->nav.nav_active = doc["nav"].as<bool>();
+        else if (doc.containsKey("active")) state->nav.nav_active = doc["active"].as<bool>();
+        else if (doc.containsKey("turn") || doc.containsKey("trn")) state->nav.nav_active = true;
+
         if (doc.containsKey("trn")) state->nav.turn_icon = doc["trn"].as<uint8_t>();
+        else if (doc.containsKey("turn")) state->nav.turn_icon = doc["turn"].as<uint8_t>();
+        else if (doc.containsKey("instruction")) state->nav.turn_icon = doc["instruction"].as<uint8_t>();
+
         if (doc.containsKey("dst")) state->nav.distance_to_turn = doc["dst"].as<uint32_t>();
+        else if (doc.containsKey("distance")) state->nav.distance_to_turn = doc["distance"].as<uint32_t>();
+
         if (doc.containsKey("exit")) state->nav.exit_num = doc["exit"].as<uint8_t>();
         if (doc.containsKey("st")) state->nav.street_name = doc["st"].as<String>();
+        else if (doc.containsKey("street")) state->nav.street_name = doc["street"].as<String>();
+
         if (doc.containsKey("eta")) state->nav.eta = doc["eta"].as<String>();
         if (doc.containsKey("rmin")) state->nav.remain_min = doc["rmin"].as<uint32_t>();
         if (doc.containsKey("rkm")) state->nav.remain_km = doc["rkm"].as<float>();
         if (doc.containsKey("avg")) state->nav.avg_speed = doc["avg"].as<int16_t>();
         if (doc.containsKey("avgL")) state->nav.avg_speed_limit = doc["avgL"].as<int16_t>();
+
         if (doc.containsKey("alrs")) state->nav.alerts = doc["alrs"].as<String>();
+        else if (doc.containsKey("alert")) state->nav.alerts = doc["alert"].as<String>();
+
         if (doc.containsKey("lan")) state->nav.lanes = doc["lan"].as<uint8_t>();
 
         // Đồng bộ thời gian thực từ GPS điện thoại (Epoch timestamp)

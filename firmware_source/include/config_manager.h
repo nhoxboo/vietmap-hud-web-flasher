@@ -6,6 +6,8 @@
 struct HudConfig {
     uint8_t  display_rotation = 1;          // Hướng quay màn hình
     bool     show_clock = true;             // Hiện đồng hồ khi rảnh
+    uint8_t  sleep_screen_mode = 0;         // 0: Mochi Animation, 1: Digital Clock, 2: Off
+    uint8_t  nav_source = 0;                // 0: Auto (Vietmap/Waze), 1: Vietmap, 2: Waze
     uint8_t  led_brightness = 80;           // Độ sáng màn hình ban ngày (10-100%)
     uint8_t  night_brightness = 25;         // Độ sáng ban đêm (10-100%)
     bool     auto_brightness = true;        // Tự động chỉnh độ sáng qua quang trở LDR
@@ -60,7 +62,9 @@ public:
 
             if (key.equalsIgnoreCase("display_rotation")) config.display_rotation = val.toInt();
             else if (key.equalsIgnoreCase("show_clock")) config.show_clock = (val.toInt() != 0);
-            else if (key.equalsIgnoreCase("led_brightness")) config.led_brightness = constrain(val.toInt(), 5, 100);
+            else if (key.equalsIgnoreCase("sleep_screen_mode")) config.sleep_screen_mode = val.toInt();
+            else if (key.equalsIgnoreCase("nav_source")) config.nav_source = val.toInt();
+            else if (key.equalsIgnoreCase("led_brightness")) config.led_brightness = val.toInt();
             else if (key.equalsIgnoreCase("night_brightness")) config.night_brightness = constrain(val.toInt(), 5, 100);
             else if (key.equalsIgnoreCase("auto_brightness")) config.auto_brightness = (val.toInt() != 0);
             else if (key.equalsIgnoreCase("speed_limit_offset")) config.speed_limit_offset = val.toInt();
@@ -80,6 +84,8 @@ public:
 
         file.printf("display_rotation=%u\n", config.display_rotation);
         file.printf("show_clock=%d\n", config.show_clock ? 1 : 0);
+        file.printf("sleep_screen_mode=%u\n", config.sleep_screen_mode);
+        file.printf("nav_source=%u\n", config.nav_source);
         file.printf("led_brightness=%u\n", config.led_brightness);
         file.printf("night_brightness=%u\n", config.night_brightness);
         file.printf("auto_brightness=%d\n", config.auto_brightness ? 1 : 0);
@@ -98,6 +104,8 @@ public:
         StaticJsonDocument<512> doc;
         doc["rotation"] = config.display_rotation;
         doc["clock"] = config.show_clock;
+        doc["sleep_mode"] = config.sleep_screen_mode;
+        doc["nav_source"] = config.nav_source;
         doc["bright_day"] = config.led_brightness;
         doc["bright_night"] = config.night_brightness;
         doc["auto_bright"] = config.auto_brightness;
@@ -118,6 +126,8 @@ public:
 
         if (doc.containsKey("rotation")) config.display_rotation = doc["rotation"];
         if (doc.containsKey("clock")) config.show_clock = doc["clock"];
+        if (doc.containsKey("sleep_mode")) config.sleep_screen_mode = doc["sleep_mode"];
+        if (doc.containsKey("nav_source")) config.nav_source = doc["nav_source"];
         if (doc.containsKey("bright_day")) config.led_brightness = doc["bright_day"];
         if (doc.containsKey("bright_night")) config.night_brightness = doc["bright_night"];
         if (doc.containsKey("auto_bright")) config.auto_brightness = doc["auto_bright"];
