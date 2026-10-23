@@ -42,12 +42,19 @@ public:
         Serial.printf("[UI] Initializing Display (100%% Max Brightness, HUD Mirror, Speed Halo) for %s...\n", BOARD_NAME);
 
         // Khóa độ sáng màn hình ở mức CỰC ĐẠI 100% cho HUD chiếu kính lái
-        #if TFT_BL >= 0
+        // Bật cả 2 chân Backlight (GPIO 27 và GPIO 21) để tương thích 100% tất cả các lô board CYD
+        #if defined(TFT_BL) && TFT_BL >= 0
         pinMode(TFT_BL, OUTPUT);
         digitalWrite(TFT_BL, HIGH);
         #endif
 
+        #if defined(TFT_BL_ALT) && TFT_BL_ALT >= 0
+        pinMode(TFT_BL_ALT, OUTPUT);
+        digitalWrite(TFT_BL_ALT, HIGH);
+        #endif
+
         // Khởi tạo chân đèn LED RGB cảnh báo nếu có
+        // Lưu ý: LED RGB trên CYD là Active LOW (Ghi LOW là BẬT, HIGH là TẮT)
         #if LED_RED_PIN >= 0
         pinMode(LED_RED_PIN, OUTPUT);
         pinMode(LED_GREEN_PIN, OUTPUT);
