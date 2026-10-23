@@ -488,14 +488,14 @@
                             </div>
 
                             <!-- Middle Main HUD -->
-                            <div class="flex items-center justify-between px-2">
-                                <!-- Speed Limit Sign Circle -->
-                                <div class="w-16 h-16 rounded-full border-4 border-red-600 bg-white flex items-center justify-center text-black font-extrabold text-2xl shadow-lg">
+                            <div class="flex items-center justify-between px-1">
+                                <!-- Speed Limit Sign Circle (PHÓNG TO NỔI BẬT: 84x84px, Border 6px, Text 3xl) -->
+                                <div class="w-[84px] h-[84px] rounded-full border-[6px] border-red-600 bg-white flex items-center justify-center text-black font-black text-3xl shadow-2xl shrink-0">
                                     <span id="sim-sign-val">60</span>
                                 </div>
 
                                 <!-- Speed Big Number -->
-                                <div class="text-center">
+                                <div class="text-center px-2">
                                     <div id="sim-speed-text" class="text-red-500 font-black text-7xl font-mono tracking-tight leading-none drop-shadow">
                                         65
                                     </div>
@@ -503,7 +503,7 @@
                                 </div>
 
                                 <!-- Turn Arrow & Distance -->
-                                <div class="text-center w-16">
+                                <div class="text-center w-16 shrink-0">
                                     <div id="sim-arrow-text" class="text-cyan-400 font-extrabold text-3xl">^^</div>
                                     <div id="sim-dist-text" class="text-white text-xs font-bold font-mono mt-1">350m</div>
                                 </div>
@@ -517,9 +517,9 @@
 
                         <!-- SCREEN 2: ROUND 240x240 -->
                         <div id="sim-box-round" class="hud-screen-round p-3 flex flex-col items-center justify-between hidden">
-                            <!-- Top Limit Sign -->
-                            <div class="w-11 h-11 rounded-full border-[3px] border-red-600 bg-white flex items-center justify-center text-black font-extrabold text-sm shadow">
-                                <span id="sim-round-sign">60</span>
+                            <!-- Speed Limit Sign Top (Phóng to: w-16 h-16, font-black) -->
+                            <div class="w-16 h-16 rounded-full border-4 border-red-600 bg-white flex items-center justify-center text-black font-black text-2xl shadow-lg mt-1 shrink-0">
+                                <span id="sim-sign-val-round">60</span>
                             </div>
 
                             <!-- Center Big Speed -->
