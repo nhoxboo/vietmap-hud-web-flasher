@@ -130,9 +130,12 @@ public:
     }
 
     void update(const SystemState& state) {
-        bool has_nav = state.ble_phone_connected && (state.nav.nav_active || state.nav.speed_limit > 0 || state.nav.speed > 0);
+        // Khi đã kết nối Bluetooth (dù là Vietmap hay Waze Hub hay Web Config):
+        // Luôn chuyển sang màn hình HUD chính!
+        // Màn hình chờ (Mochi / Đồng hồ) CHỈ hiển thị khi CHƯA kết nối Bluetooth
+        bool show_hud = state.ble_phone_connected;
 
-        if (has_nav) {
+        if (show_hud) {
             #if SCREEN_IS_ROUND
             renderRoundNavScreen(state);
             #else
@@ -140,7 +143,7 @@ public:
             #endif
         } else {
             renderStandbyScreen(state);
-            setLedColor(0, 1, 0); // Xanh lá khi chờ
+            setLedColor(0, 1, 0); // Xanh lá khi chờ kết nối
         }
     }
 
