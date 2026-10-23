@@ -273,20 +273,37 @@
 
                 <!-- Configuration Form -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Display & Brightness Card -->
+                    <!-- Display & HUD Mirror Card -->
                     <div class="p-6 rounded-2xl border border-slate-200 bg-white space-y-4 shadow-sm">
                         <div class="flex items-center space-x-2 text-slate-900 font-bold">
-                            <i data-lucide="sun" class="w-5 h-5 text-amber-500"></i>
-                            <span>Hiển Thị & Màn Hình HUD</span>
+                            <i data-lucide="flip-horizontal" class="w-5 h-5 text-blue-600"></i>
+                            <span>Hiển Thị & Lật Gương Kính Lái</span>
                         </div>
                         
-                        <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center space-x-2">
-                            <i data-lucide="zap" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
-                            <span><strong>Độ sáng màn hình: Luôn 100% Cực Đại</strong> (Khóa cố định chống chói nắng ngoài trời khi phản chiếu lên kính lái).</span>
+                        <!-- Chế độ Lật gương HUD Mirror -->
+                        <div class="p-3 bg-blue-50/80 rounded-xl border border-blue-200 flex items-center justify-between">
+                            <div>
+                                <span class="text-sm font-bold text-blue-950 block">Chế độ Lật Gương (HUD Mirror)</span>
+                                <span class="text-xs text-blue-700">Lật ngược chữ để hắt lên kính chắn gió ô tô</span>
+                            </div>
+                            <input type="checkbox" id="cfg-mirror" onchange="toggleSimMirror(this.checked)" class="w-5 h-5 text-blue-600 rounded border-blue-300 focus:ring-blue-500 cursor-pointer">
                         </div>
 
+                        <!-- Chọn bên Cổng Sạc USB -->
                         <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <span class="text-sm text-slate-700 font-medium">Xoay hướng màn hình</span>
+                            <div>
+                                <span class="text-sm text-slate-700 font-medium block">Vị trí Cổng Sạc USB</span>
+                                <span class="text-[11px] text-slate-400">Tự động xoay 180° theo hướng luồn dây taplo</span>
+                            </div>
+                            <select id="cfg-usb-side" class="text-xs font-semibold border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-700">
+                                <option value="0">Cổng sạc bên TRÁI (Left)</option>
+                                <option value="1">Cổng sạc bên PHẢI (Right)</option>
+                            </select>
+                        </div>
+
+                        <!-- Xoay màn hình -->
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-700 font-medium">Hướng quay màn hình</span>
                             <select id="cfg-rotation" class="text-xs font-medium border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-slate-700">
                                 <option value="1">Ngang chuẩn (Rotation 1)</option>
                                 <option value="3">Ngang ngược (Rotation 3)</option>
@@ -295,8 +312,9 @@
                             </select>
                         </div>
 
+                        <!-- Chế độ màn hình chờ -->
                         <div class="flex items-center justify-between pt-2 border-t border-slate-100">
-                            <span class="text-sm text-slate-700 font-medium">Chế độ Màn hình chờ (Screensaver)</span>
+                            <span class="text-sm text-slate-700 font-medium">Màn hình chờ (Standby)</span>
                             <select id="cfg-sleep-mode" class="text-xs font-semibold border border-blue-200 rounded-lg px-2.5 py-1.5 bg-blue-50/50 text-blue-800">
                                 <option value="0">🐰 Hoạt ảnh Mochi (Mochi Animation)</option>
                                 <option value="1">⏰ Đồng hồ số lớn (Digital Clock)</option>
@@ -304,6 +322,7 @@
                             </select>
                         </div>
 
+                        <!-- Nguồn dẫn đường -->
                         <div class="flex items-center justify-between pt-2 border-t border-slate-100">
                             <span class="text-sm text-slate-700 font-medium">Nguồn Dẫn Đường (Nav Source)</span>
                             <select id="cfg-nav-source" class="text-xs font-semibold border border-blue-200 rounded-lg px-2.5 py-1.5 bg-blue-50/50 text-blue-800">
@@ -312,32 +331,47 @@
                                 <option value="2">🚗 Waze Navigation Hub</option>
                             </select>
                         </div>
+
+                        <!-- Cố định 100% sáng -->
+                        <div class="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800 flex items-center space-x-2">
+                            <i data-lucide="sun" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
+                            <span><strong>Độ sáng màn hình: Luôn 100% Cực Đại</strong> (Chống chói nắng ngoài trời khi phản chiếu lên kính lái).</span>
+                        </div>
                     </div>
 
-                    <!-- Alerts & Sounds Card -->
+                    <!-- Speed Alert Halo & Speed Offset Card -->
                     <div class="p-6 rounded-2xl border border-slate-200 bg-white space-y-4 shadow-sm">
                         <div class="flex items-center space-x-2 text-slate-900 font-bold">
-                            <i data-lucide="bell-ring" class="w-5 h-5 text-blue-600"></i>
-                            <span>Cảnh Báo & Âm Thanh</span>
+                            <i data-lucide="shield-alert" class="w-5 h-5 text-red-600"></i>
+                            <span>Cảnh Báo Tốc Độ & Hào Quang</span>
                         </div>
 
+                        <!-- Km chênh lệch cho phép -->
                         <div>
                             <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                                <span>Bù trừ tốc độ cảnh báo (Offset)</span>
-                                <span id="val-offset">0 km/h</span>
+                                <span>Km Chênh lệch cho phép (Speed Offset)</span>
+                                <span id="val-offset" class="text-red-600 font-bold">+0 km/h</span>
                             </div>
-                            <input type="range" id="cfg-offset" min="-10" max="15" value="0" oninput="updateVal('offset')" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
-                            <p class="text-[11px] text-slate-400 mt-1">Ví dụ đặt +5 km/h: Biển 60 thì chạy 66 km/h mới bắt đầu báo bíp.</p>
+                            <input type="range" id="cfg-offset" min="-10" max="20" value="0" oninput="updateVal('offset')" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-red-600">
+                            <p class="text-[11px] text-slate-400 mt-1">Ví dụ đặt +5 km/h: Biển 60 thì chạy vượt 65 km/h mới kích hoạt cảnh báo hào quang đỏ.</p>
                         </div>
 
-                        <div class="flex items-center justify-between pt-2">
-                            <span class="text-sm text-slate-700 font-medium">Kêu bíp khi đổi biển báo tốc độ</span>
-                            <input type="checkbox" id="cfg-beep-limit" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        <!-- Thời gian duy trì cảnh báo -->
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <span class="text-sm text-slate-700 font-medium">Thời gian duy trì cảnh báo</span>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="cfg-alert-dur" min="1" max="30" value="5" class="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs text-center font-bold text-slate-800">
+                                <span class="text-xs text-slate-500">giây</span>
+                            </div>
                         </div>
 
-                        <div class="flex items-center justify-between pt-2">
-                            <span class="text-sm text-slate-700 font-medium">Kêu bíp dồn dập khi quá tốc độ</span>
-                            <input type="checkbox" id="cfg-beep-speed" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                        <!-- Đèn LED RGB phần cứng -->
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                            <div>
+                                <span class="text-sm text-slate-700 font-medium block">Đèn LED RGB Cảnh Báo</span>
+                                <span class="text-[11px] text-slate-400">Chớp LED ĐỎ trên board khi quá tốc độ</span>
+                            </div>
+                            <input type="checkbox" id="cfg-led-alert" checked class="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500 cursor-pointer">
                         </div>
 
                         <div class="pt-2 border-t border-slate-100">
@@ -654,11 +688,24 @@
             }
         }
 
+        function toggleSimMirror(isMirror) {
+            const screenCyd = document.getElementById('sim-box-cyd');
+            const screenRound = document.getElementById('sim-box-round');
+            if (isMirror) {
+                if (screenCyd) screenCyd.style.transform = 'scaleX(-1)';
+                if (screenRound) screenRound.style.transform = 'scaleX(-1)';
+            } else {
+                if (screenCyd) screenCyd.style.transform = 'none';
+                if (screenRound) screenRound.style.transform = 'none';
+            }
+        }
+
         // Simulator controls
         function updateSimUi() {
             const spd = parseInt(document.getElementById('sim-spd').value);
             const dst = parseInt(document.getElementById('sim-dst').value);
             const alertText = document.getElementById('sim-alert-select').value;
+            const offset = parseInt(document.getElementById('cfg-offset') ? document.getElementById('cfg-offset').value : 0);
 
             document.getElementById('sim-spd-val').innerText = spd + " km/h";
             document.getElementById('sim-dst-val').innerText = (dst >= 1000) ? (dst/1000).toFixed(1) + " km" : dst + " m";
@@ -677,13 +724,26 @@
             document.getElementById('sim-round-arrow').innerText = simTurnArrow;
             document.getElementById('sim-round-dist').innerText = (dst >= 1000) ? (dst/1000).toFixed(1) + " km" : dst + " m";
 
-            // Overspeed check
-            const isOverspeed = spd > simLimit;
+            // Overspeed check có tính đến km chênh lệch (Offset)
+            const isOverspeed = (simLimit > 0 && spd > (simLimit + offset));
+            const cydBox = document.getElementById('sim-box-cyd');
+            const roundCircle = document.getElementById('sim-box-round')?.firstElementChild;
+
             if (isOverspeed) {
                 speedText.className = "text-red-500 font-black text-7xl font-mono tracking-tight leading-none drop-shadow animate-pulse";
                 document.getElementById('sim-round-speed').className = "text-red-500 font-black text-6xl font-mono leading-none animate-pulse";
-                banner.innerText = "CẢNH BÁO QUÁ TỐC ĐỘ " + simLimit + " KM/H!";
+                banner.innerText = "CẢNH BÁO QUÁ TỐC ĐỘ " + simLimit + " KM/H (+" + offset + ")!";
                 banner.className = "bg-red-600 text-white text-xs font-bold py-1.5 px-3 rounded text-center tracking-wide animate-pulse";
+
+                // Vòng hào quang viền đỏ nhấp nháy trên CYD & Round
+                if (cydBox) {
+                    cydBox.classList.add('border-4', 'border-red-600', 'animate-pulse');
+                    cydBox.classList.remove('border-slate-800');
+                }
+                if (roundCircle) {
+                    roundCircle.classList.add('border-red-600', 'animate-pulse');
+                    roundCircle.classList.remove('border-cyan-500');
+                }
             } else {
                 speedText.className = "text-emerald-400 font-black text-7xl font-mono tracking-tight leading-none drop-shadow";
                 document.getElementById('sim-round-speed').className = "text-emerald-400 font-black text-6xl font-mono leading-none";
@@ -693,6 +753,15 @@
                 } else {
                     banner.innerText = "Quốc Lộ 1A - Tuyến Tránh Biên Hòa";
                     banner.className = "bg-slate-900 text-cyan-300 text-xs font-semibold py-1.5 px-3 rounded text-center tracking-wide";
+                }
+
+                if (cydBox) {
+                    cydBox.classList.remove('border-4', 'border-red-600', 'animate-pulse');
+                    cydBox.classList.add('border-slate-800');
+                }
+                if (roundCircle) {
+                    roundCircle.classList.remove('border-red-600', 'animate-pulse');
+                    roundCircle.classList.add('border-cyan-500');
                 }
             }
         }
@@ -818,21 +887,20 @@
 
             const cfg = {
                 type: "set_cfg",
-                bright_day: parseInt(document.getElementById('cfg-bright-day').value),
-                bright_night: parseInt(document.getElementById('cfg-bright-night').value),
-                auto_bright: document.getElementById('cfg-auto-bright').checked,
+                mirror: document.getElementById('cfg-mirror').checked,
+                usb_side: parseInt(document.getElementById('cfg-usb-side').value),
                 rotation: parseInt(document.getElementById('cfg-rotation').value),
                 sleep_mode: parseInt(document.getElementById('cfg-sleep-mode').value),
                 nav_source: parseInt(document.getElementById('cfg-nav-source').value),
                 offset: parseInt(document.getElementById('cfg-offset').value),
-                beep_limit: document.getElementById('cfg-beep-limit').checked,
-                beep_speed: document.getElementById('cfg-beep-speed').checked,
+                alert_dur: parseInt(document.getElementById('cfg-alert-dur').value),
+                led_alert: document.getElementById('cfg-led-alert').checked,
                 welcome: document.getElementById('cfg-welcome').value
             };
 
             const data = new TextEncoder().encode(JSON.stringify(cfg) + "\n");
             await bleCharWrite.writeValue(data);
-            alert("Đã lưu cấu hình mới thành công vào HUD!");
+            alert("Đã lưu cấu hình mới thành công vào HUD qua Bluetooth!");
         }
 
         function handleBleNotification(event) {
@@ -840,18 +908,18 @@
             try {
                 const doc = JSON.parse(raw);
                 if (doc.type === "cfg_resp") {
-                    if (doc.bright_day) document.getElementById('cfg-bright-day').value = doc.bright_day;
-                    if (doc.bright_night) document.getElementById('cfg-bright-night').value = doc.bright_night;
-                    if (doc.offset !== undefined) document.getElementById('cfg-offset').value = doc.offset;
-                    if (doc.welcome) document.getElementById('cfg-welcome').value = doc.welcome;
+                    if (doc.mirror !== undefined) {
+                        document.getElementById('cfg-mirror').checked = doc.mirror;
+                        toggleSimMirror(doc.mirror);
+                    }
+                    if (doc.usb_side !== undefined) document.getElementById('cfg-usb-side').value = doc.usb_side;
+                    if (doc.rotation !== undefined) document.getElementById('cfg-rotation').value = doc.rotation;
                     if (doc.sleep_mode !== undefined) document.getElementById('cfg-sleep-mode').value = doc.sleep_mode;
                     if (doc.nav_source !== undefined) document.getElementById('cfg-nav-source').value = doc.nav_source;
-                    if (doc.rotation !== undefined) document.getElementById('cfg-rotation').value = doc.rotation;
-                    if (doc.auto_bright !== undefined) document.getElementById('cfg-auto-bright').checked = doc.auto_bright;
-                    if (doc.beep_limit !== undefined) document.getElementById('cfg-beep-limit').checked = doc.beep_limit;
-                    if (doc.beep_speed !== undefined) document.getElementById('cfg-beep-speed').checked = doc.beep_speed;
-                    updateVal('bright-day');
-                    updateVal('bright-night');
+                    if (doc.offset !== undefined) document.getElementById('cfg-offset').value = doc.offset;
+                    if (doc.alert_dur !== undefined) document.getElementById('cfg-alert-dur').value = doc.alert_dur;
+                    if (doc.led_alert !== undefined) document.getElementById('cfg-led-alert').checked = doc.led_alert;
+                    if (doc.welcome) document.getElementById('cfg-welcome').value = doc.welcome;
                     updateVal('offset');
                 }
             } catch (e) {}

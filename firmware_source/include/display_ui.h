@@ -39,20 +39,24 @@ public:
     }
 
     void begin() {
-        Serial.printf("[UI] Initializing Display (100%% Max Brightness, No Buzzer/LDR) for %s...\n", BOARD_NAME);
+        Serial.printf("[UI] Initializing Display (100%% Max Brightness, HUD Mirror, Speed Halo) for %s...\n", BOARD_NAME);
 
-        // Khóa độ sáng màn hình ở mức CỰC ĐẠI 100% (255) cho HUD phản xạ kính lái
+        // Khóa độ sáng màn hình ở mức CỰC ĐẠI 100% cho HUD chiếu kính lái
         #if TFT_BL >= 0
         pinMode(TFT_BL, OUTPUT);
-        digitalWrite(TFT_BL, HIGH); // Luôn luôn 100% sáng tối đa, chống chói ngoài trời nắng
+        digitalWrite(TFT_BL, HIGH);
+        #endif
+
+        // Khởi tạo chân đèn LED RGB cảnh báo nếu có
+        #if LED_RED_PIN >= 0
+        pinMode(LED_RED_PIN, OUTPUT);
+        pinMode(LED_GREEN_PIN, OUTPUT);
+        pinMode(LED_BLUE_PIN, OUTPUT);
+        setLedColor(0, 1, 0); // Xanh lá mặc định
         #endif
 
         tft.init();
-        #if SCREEN_IS_ROUND
-        tft.setRotation(0);
-        #else
-        tft.setRotation(ConfigManager::getInstance().get().display_rotation);
-        #endif
+        applyRotationAndMirror();
         tft.fillScreen(TFT_BLACK);
 
         // Khởi tạo bộ giải nén ảnh JPEG TJpgDec
@@ -61,6 +65,34 @@ public:
         TJpgDec.setCallback(tft_output);
 
         drawBootScreen();
+    }
+
+    void applyRotationAndMirror() {
+        #if SCREEN_IS_ROUND
+        tft.setRotation(0);
+        #else
+        uint8_t base_rot = ConfigManager::getInstance().get().display_rotation;
+        // Nếu chọn cổng sạc bên Phải -> xoay đảo 180 độ so với bên Trái
+        if (ConfigManager::getInstance().get().usb_side == 1) {
+            base_rot = (base_rot == 1) ? 3 : (base_rot == 3) ? 1 : (base_rot == 0) ? 2 : 0;
+        }
+
+        // Chế độ Lật gương (Mirror Mode): TFT_eSPI hỗ trợ lật gương bằng cách + 4 vào rotation (4..7)
+        if (ConfigManager::getInstance().get().hud_mirror) {
+            tft.setRotation(base_rot + 4);
+        } else {
+            tft.setRotation(base_rot);
+        }
+        #endif
+    }
+
+    void setLedColor(bool r, bool g, bool b) {
+        #if LED_RED_PIN >= 0
+        // LED RGB trên CYD là Active LOW (LOW = BẬT, HIGH = TẮT)
+        digitalWrite(LED_RED_PIN, r ? LOW : HIGH);
+        digitalWrite(LED_GREEN_PIN, g ? LOW : HIGH);
+        digitalWrite(LED_BLUE_PIN, b ? LOW : HIGH);
+        #endif
     }
 
     void drawBootScreen() {
@@ -82,7 +114,9 @@ public:
         tft.setTextColor(TFT_GREEN, TFT_BLACK);
         tft.drawCentreString("Bluetooth: VIETMAP_HUD (Ready)", 160, 100, 2);
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.drawCentreString("Do sang: 100% MAX HUD", 160, 140, 2);
+        
+        String mode_desc = ConfigManager::getInstance().get().hud_mirror ? "HUD MIRROR (Chieu Kinh)" : "HUD DIRECT (Nhin Thang)";
+        tft.drawCentreString(mode_desc, 160, 140, 2);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         tft.drawCentreString("Ket noi Vietmap Live hoac Waze Hub", 160, 180, 2);
         #endif
@@ -99,6 +133,7 @@ public:
             #endif
         } else {
             renderStandbyScreen(state);
+            setLedColor(0, 1, 0); // Xanh lá khi chờ
         }
     }
 
@@ -107,12 +142,19 @@ public:
         tft.fillScreen(TFT_BLACK);
     }
 
+    void toggleMirror() {
+        ConfigManager::getInstance().get().hud_mirror = !ConfigManager::getInstance().get().hud_mirror;
+        ConfigManager::getInstance().saveConfig();
+        applyRotationAndMirror();
+        tft.fillScreen(TFT_BLACK);
+    }
+
     void rotateScreen() {
         #if !SCREEN_IS_ROUND
-        uint8_t rot = (tft.getRotation() + 1) % 4;
-        tft.setRotation(rot);
+        uint8_t rot = (ConfigManager::getInstance().get().display_rotation == 1) ? 3 : 1;
         ConfigManager::getInstance().get().display_rotation = rot;
         ConfigManager::getInstance().saveConfig();
+        applyRotationAndMirror();
         tft.fillScreen(TFT_BLACK);
         #endif
     }
@@ -126,6 +168,8 @@ private:
     uint8_t  screen_mode = 0;
     uint8_t  mochi_cur_frame = 0;
     uint32_t last_anim_frame_time = 0;
+    uint32_t last_halo_blink_time = 0;
+    bool     halo_blink_state = false;
 
     DisplayUI() {}
 
@@ -145,7 +189,11 @@ private:
 
         int16_t spd = state.nav.speed;
         int16_t lim = state.nav.speed_limit;
-        bool overspeed = (lim > 0 && spd > (lim + ConfigManager::getInstance().get().speed_limit_offset));
+        int16_t max_allowed = lim + ConfigManager::getInstance().get().speed_limit_offset;
+        bool overspeed = (lim > 0 && spd > max_allowed);
+
+        // --- VÒNG HÀO QUANG CẢNH BÁO TỐC ĐỘ (SPEED ALERT HALO) & ĐÈN LED ---
+        drawSpeedAlertHalo(overspeed);
 
         // 1. Biển báo giới hạn tốc độ gốc (JPEG 60x60)
         if (lim != last_limit) {
@@ -198,8 +246,38 @@ private:
             snprintf(trip_buf, sizeof(trip_buf), "Con: %.1f km (%d p)", state.nav.remain_km, state.nav.remain_min);
             tft.drawRightString(trip_buf, 310, 212, 2);
         } else {
-            tft.drawRightString("HUD CONNECTED", 310, 212, 2);
+            tft.drawRightString(ConfigManager::getInstance().get().hud_mirror ? "MIRROR" : "HUD LIVE", 310, 212, 2);
         }
+    }
+
+    void drawSpeedAlertHalo(bool overspeed) {
+        uint32_t now = millis();
+        if (now - last_halo_blink_time >= 350) {
+            last_halo_blink_time = now;
+            halo_blink_state = !halo_blink_state;
+        }
+
+        #if !SCREEN_IS_ROUND
+        if (overspeed) {
+            // Khi quá tốc độ: Hào quang viền ngoài cùng nhấp nháy ĐỎ rực
+            uint16_t halo_col = halo_blink_state ? TFT_RED : TFT_MAROON;
+            tft.drawRoundRect(0, 0, 320, 240, 8, halo_col);
+            tft.drawRoundRect(1, 1, 318, 238, 7, halo_col);
+            tft.drawRoundRect(2, 2, 316, 236, 6, halo_col);
+
+            // Đèn LED phần cứng chớp ĐỎ cảnh báo
+            if (ConfigManager::getInstance().get().enable_led_alert) {
+                setLedColor(halo_blink_state, 0, 0);
+            }
+        } else {
+            // Tốc độ bình thường: Viền Xanh sẫm nhẹ nhàng
+            tft.drawRoundRect(0, 0, 320, 240, 8, TFT_BLACK);
+            tft.drawRoundRect(1, 1, 318, 238, 7, TFT_NAVY);
+            if (ConfigManager::getInstance().get().enable_led_alert) {
+                setLedColor(0, 1, 0); // Xanh lá dịu
+            }
+        }
+        #endif
     }
 
     // =========================================================================
@@ -217,10 +295,13 @@ private:
 
         int16_t spd = state.nav.speed;
         int16_t lim = state.nav.speed_limit;
+        int16_t max_allowed = lim + ConfigManager::getInstance().get().speed_limit_offset;
+        bool overspeed = (lim > 0 && spd > max_allowed);
 
-        // Vòng cung tốc độ quanh viền tròn
-        uint16_t arc_color = (lim > 0 && spd > lim) ? TFT_RED : TFT_CYAN;
-        tft.drawCircle(120, 120, 118, TFT_NAVY);
+        // Vòng hào quang tốc độ thể thao quanh viền màn hình tròn (Speed Arc Halo)
+        uint16_t arc_color = overspeed ? TFT_RED : TFT_CYAN;
+        tft.drawCircle(120, 120, 119, overspeed ? TFT_RED : TFT_BLACK);
+        tft.drawCircle(120, 120, 118, overspeed ? TFT_RED : TFT_NAVY);
         tft.drawCircle(120, 120, 117, arc_color);
 
         // Biển báo tốc độ ở đỉnh trên
@@ -234,9 +315,7 @@ private:
             last_speed = spd;
             tft.fillRect(40, 85, 160, 75, TFT_BLACK);
 
-            bool overspeed = (lim > 0 && spd > (lim + ConfigManager::getInstance().get().speed_limit_offset));
             tft.setTextColor(overspeed ? TFT_RED : TFT_WHITE, TFT_BLACK);
-
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", spd);
             tft.drawCentreString(buf, 120, 85, 7);
@@ -259,7 +338,6 @@ private:
     void renderStandbyScreen(const SystemState& state) {
         uint8_t mode = ConfigManager::getInstance().get().sleep_screen_mode;
 
-        // Chế độ 2: Tắt màn hình / Màn hình đen
         if (mode == 2) {
             if (last_mode != 0) {
                 tft.fillScreen(TFT_BLACK);
@@ -268,7 +346,6 @@ private:
             return;
         }
 
-        // Chế độ 0: Mochi Animation (Hoạt ảnh Mochi 160x80)
         if (mode == 0) {
             if (last_mode != 0) {
                 tft.fillScreen(TFT_BLACK);
@@ -282,7 +359,7 @@ private:
             }
 
             uint32_t now = millis();
-            if (now - last_anim_frame_time >= 65) { // ~15 FPS
+            if (now - last_anim_frame_time >= 65) {
                 last_anim_frame_time = now;
                 mochi_cur_frame = (mochi_cur_frame + 1) % MOCHI_FRAME_COUNT;
 
@@ -303,7 +380,7 @@ private:
             return;
         }
 
-        // Chế độ 1: Đồng hồ số lớn (Digital Clock)
+        // Chế độ 1: Đồng hồ số lớn
         if (last_mode != 0) {
             tft.fillScreen(TFT_BLACK);
             last_mode = 0;

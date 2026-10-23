@@ -4,17 +4,16 @@
 #include <ArduinoJson.h>
 
 struct HudConfig {
-    uint8_t  display_rotation = 1;          // Hướng quay màn hình
+    uint8_t  display_rotation = 1;          // Hướng quay màn hình: 0, 1, 2, 3
+    bool     hud_mirror = false;            // Chế độ lật gương chiếu kính lái (HUD Mirror Mode)
+    uint8_t  usb_side = 0;                  // 0: Cổng sạc bên Trái (Left), 1: Cổng sạc bên Phải (Right)
     bool     show_clock = true;             // Hiện đồng hồ khi rảnh
     uint8_t  sleep_screen_mode = 0;         // 0: Mochi Animation, 1: Digital Clock, 2: Off
     uint8_t  nav_source = 0;                // 0: Auto (Vietmap/Waze), 1: Vietmap, 2: Waze
-    uint8_t  led_brightness = 80;           // Độ sáng màn hình ban ngày (10-100%)
-    uint8_t  night_brightness = 25;         // Độ sáng ban đêm (10-100%)
-    bool     auto_brightness = true;        // Tự động chỉnh độ sáng qua quang trở LDR
-    int8_t   speed_limit_offset = 0;        // Bù trừ tốc độ (+/- km/h)
-    bool     beep_limit_change = true;      // Kêu bíp khi thay đổi biển báo tốc độ
-    bool     beep_overspeed = true;         // Kêu bíp khi chạy quá tốc độ
+    int8_t   speed_limit_offset = 0;        // Km chênh lệch cho phép (+/- km/h)
+    uint8_t  alert_duration = 5;            // Thời gian duy trì cảnh báo quá tốc độ (giây)
     bool     show_text_kmh = true;          // Hiện chữ km/h
+    bool     enable_led_alert = true;       // Bật đèn LED cảnh báo RGB phần cứng
     String   welcome_text = "VIETMAP HUD PRO";
     uint32_t boot_screen_duration = 2000;   // Thời gian khởi động (ms)
 };
@@ -57,20 +56,18 @@ public:
 
             String key = line.substring(0, sep);
             String val = line.substring(sep + 1);
-            key.trim();
-            val.trim();
+            key.trim(); val.trim();
 
             if (key.equalsIgnoreCase("display_rotation")) config.display_rotation = val.toInt();
+            else if (key.equalsIgnoreCase("hud_mirror")) config.hud_mirror = (val.toInt() != 0);
+            else if (key.equalsIgnoreCase("usb_side")) config.usb_side = val.toInt();
             else if (key.equalsIgnoreCase("show_clock")) config.show_clock = (val.toInt() != 0);
             else if (key.equalsIgnoreCase("sleep_screen_mode")) config.sleep_screen_mode = val.toInt();
             else if (key.equalsIgnoreCase("nav_source")) config.nav_source = val.toInt();
-            else if (key.equalsIgnoreCase("led_brightness")) config.led_brightness = val.toInt();
-            else if (key.equalsIgnoreCase("night_brightness")) config.night_brightness = constrain(val.toInt(), 5, 100);
-            else if (key.equalsIgnoreCase("auto_brightness")) config.auto_brightness = (val.toInt() != 0);
             else if (key.equalsIgnoreCase("speed_limit_offset")) config.speed_limit_offset = val.toInt();
-            else if (key.equalsIgnoreCase("beep_limit_change")) config.beep_limit_change = (val.toInt() != 0);
-            else if (key.equalsIgnoreCase("beep_overspeed")) config.beep_overspeed = (val.toInt() != 0);
+            else if (key.equalsIgnoreCase("alert_duration")) config.alert_duration = val.toInt();
             else if (key.equalsIgnoreCase("show_text_kmh")) config.show_text_kmh = (val.toInt() != 0);
+            else if (key.equalsIgnoreCase("enable_led_alert")) config.enable_led_alert = (val.toInt() != 0);
             else if (key.equalsIgnoreCase("welcome_text")) config.welcome_text = val;
             else if (key.equalsIgnoreCase("boot_screen_duration")) config.boot_screen_duration = val.toInt();
         }
@@ -83,16 +80,15 @@ public:
         if (!file) return;
 
         file.printf("display_rotation=%u\n", config.display_rotation);
+        file.printf("hud_mirror=%d\n", config.hud_mirror ? 1 : 0);
+        file.printf("usb_side=%u\n", config.usb_side);
         file.printf("show_clock=%d\n", config.show_clock ? 1 : 0);
         file.printf("sleep_screen_mode=%u\n", config.sleep_screen_mode);
         file.printf("nav_source=%u\n", config.nav_source);
-        file.printf("led_brightness=%u\n", config.led_brightness);
-        file.printf("night_brightness=%u\n", config.night_brightness);
-        file.printf("auto_brightness=%d\n", config.auto_brightness ? 1 : 0);
         file.printf("speed_limit_offset=%d\n", config.speed_limit_offset);
-        file.printf("beep_limit_change=%d\n", config.beep_limit_change ? 1 : 0);
-        file.printf("beep_overspeed=%d\n", config.beep_overspeed ? 1 : 0);
+        file.printf("alert_duration=%u\n", config.alert_duration);
         file.printf("show_text_kmh=%d\n", config.show_text_kmh ? 1 : 0);
+        file.printf("enable_led_alert=%d\n", config.enable_led_alert ? 1 : 0);
         file.printf("welcome_text=%s\n", config.welcome_text.c_str());
         file.printf("boot_screen_duration=%u\n", config.boot_screen_duration);
 
@@ -103,17 +99,17 @@ public:
     String toJsonString() {
         StaticJsonDocument<512> doc;
         doc["rotation"] = config.display_rotation;
+        doc["mirror"] = config.hud_mirror;
+        doc["usb_side"] = config.usb_side;
         doc["clock"] = config.show_clock;
         doc["sleep_mode"] = config.sleep_screen_mode;
         doc["nav_source"] = config.nav_source;
-        doc["bright_day"] = config.led_brightness;
-        doc["bright_night"] = config.night_brightness;
-        doc["auto_bright"] = config.auto_brightness;
         doc["offset"] = config.speed_limit_offset;
-        doc["beep_limit"] = config.beep_limit_change;
-        doc["beep_speed"] = config.beep_overspeed;
+        doc["alert_dur"] = config.alert_duration;
         doc["text_kmh"] = config.show_text_kmh;
+        doc["led_alert"] = config.enable_led_alert;
         doc["welcome"] = config.welcome_text;
+        
         String out;
         serializeJson(doc, out);
         return out;
@@ -125,15 +121,15 @@ public:
         if (err) return false;
 
         if (doc.containsKey("rotation")) config.display_rotation = doc["rotation"];
+        if (doc.containsKey("mirror")) config.hud_mirror = doc["mirror"];
+        if (doc.containsKey("usb_side")) config.usb_side = doc["usb_side"];
         if (doc.containsKey("clock")) config.show_clock = doc["clock"];
         if (doc.containsKey("sleep_mode")) config.sleep_screen_mode = doc["sleep_mode"];
         if (doc.containsKey("nav_source")) config.nav_source = doc["nav_source"];
-        if (doc.containsKey("bright_day")) config.led_brightness = doc["bright_day"];
-        if (doc.containsKey("bright_night")) config.night_brightness = doc["bright_night"];
-        if (doc.containsKey("auto_bright")) config.auto_brightness = doc["auto_bright"];
         if (doc.containsKey("offset")) config.speed_limit_offset = doc["offset"];
-        if (doc.containsKey("beep_limit")) config.beep_limit_change = doc["beep_limit"];
-        if (doc.containsKey("beep_speed")) config.beep_overspeed = doc["beep_speed"];
+        if (doc.containsKey("alert_dur")) config.alert_duration = doc["alert_dur"];
+        if (doc.containsKey("text_kmh")) config.show_text_kmh = doc["text_kmh"];
+        if (doc.containsKey("led_alert")) config.enable_led_alert = doc["led_alert"];
         if (doc.containsKey("welcome")) config.welcome_text = doc["welcome"].as<String>();
 
         saveConfig();
